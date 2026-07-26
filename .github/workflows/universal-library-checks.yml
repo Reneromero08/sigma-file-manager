@@ -16,7 +16,7 @@ permissions:
   contents: write
 
 jobs:
-  canonicalize-pr10:
+  diagnose-pr10:
     if: github.event_name == 'pull_request' && github.head_ref == 'feat/universal-library-bundled-extension'
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -30,13 +30,20 @@ jobs:
           node-version: 24.16.0
           cache: npm
       - run: npm ci
-      - run: npx eslint src/composables/use-init.ts src/modules/extensions/bundled-extension-bootstrap.ts src/modules/extensions/bundled-extension-sync.ts src/modules/extensions/__tests__/bundled-extension-sync.test.ts --fix
-      - run: npm run ts && npm run lint:check && npm run test:unit:run
+      - run: |
+          mkdir -p diagnostics
+          set +e
+          npm run ts > diagnostics/pr10-ts.txt 2>&1
+          echo $? > diagnostics/pr10-ts.status
+          npm run lint:check > diagnostics/pr10-lint.txt 2>&1
+          echo $? > diagnostics/pr10-lint.status
+          npm run test:unit:run > diagnostics/pr10-tests.txt 2>&1
+          echo $? > diagnostics/pr10-tests.status
+          set -e
       - run: |
           git show origin/product:.github/workflows/universal-library-checks.yml > .github/workflows/universal-library-checks.yml
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -A
-          if git diff --cached --quiet; then exit 0; fi
-          git commit -m "style: canonicalize bundled extension integration"
+          git add .github/workflows/universal-library-checks.yml diagnostics
+          git commit -m "test: capture remaining PR10 validation report"
           git push origin HEAD:feat/universal-library-bundled-extension
