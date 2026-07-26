@@ -1,6 +1,7 @@
 name: Apply ulib Windows path search fix
 
 on:
+  workflow_dispatch:
   push:
     branches:
       - feat/universal-library-binary-artifacts
