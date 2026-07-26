@@ -1,6 +1,7 @@
 name: Apply bundled Universal Library bootstrap
 
 on:
+  workflow_dispatch:
   push:
     branches:
       - feat/universal-library-bundled-extension
