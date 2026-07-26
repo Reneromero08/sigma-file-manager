@@ -22,6 +22,9 @@ import { disableWebViewFeatures } from '@/utils/disable-web-view-features';
 import { useChangelog } from '@/modules/changelog';
 import { useAppUpdater } from '@/modules/app-updater';
 import { useExtensionsStore } from '@/stores/runtime/extensions';
+import { useExtensionsStorageStore } from '@/stores/storage/extensions';
+import { bootstrapBundledUniversalLibrary } from '@/modules/extensions/bundled-extension-bootstrap';
+import { BUNDLED_UNIVERSAL_LIBRARY_ID } from '@/modules/extensions/bundled-extension-sync';
 import { useArchiveJobsStore } from '@/stores/runtime/archive-jobs';
 import { useDeleteJobsStore } from '@/stores/runtime/delete-jobs';
 import { useCopyMoveJobsStore } from '@/stores/runtime/copy-move-jobs';
@@ -66,6 +69,7 @@ export function useInit() {
   const terminalsStore = useTerminalsStore();
   const backgroundMediaStore = useBackgroundMediaStore();
   const extensionsStore = useExtensionsStore();
+  const extensionsStorageStore = useExtensionsStorageStore();
   const archiveJobsStore = useArchiveJobsStore();
   const deleteJobsStore = useDeleteJobsStore();
   const copyMoveJobsStore = useCopyMoveJobsStore();
@@ -391,7 +395,63 @@ export function useInit() {
     );
     runInBackgroundWithTrace(
       'background:extensions.init',
-      () => extensionsStore.init(),
+      async () => {
+        await extensionsStore.init();
+
+        if (!isMainWindow) {
+          return;
+        }
+
+        const result = await bootstrapBundledUniversalLibrary({
+          getInstalledExtension: () => (
+            extensionsStorageStore.extensionsData.installedExtensions[
+              BUNDLED_UNIVERSAL_LIBRARY_ID
+            ]
+          ),
+          installLocalExtension: sourcePath => (
+            extensionsStore.installLocalExtension(sourcePath)
+          ),
+          refreshLocalExtensionFromSource: async (
+            extensionId,
+            sourcePath,
+            expectedVersion,
+          ) => {
+            const extensionData = extensionsStorageStore
+              .extensionsData
+              .installedExtensions[extensionId];
+
+            if (!extensionData?.isLocal) {
+              throw new Error(`Bundled extension "${extensionId}" is not a local extension`);
+            }
+
+            const previousSourcePath = extensionData.localSourcePath;
+            extensionData.localSourcePath = sourcePath;
+
+            try {
+              await extensionsStore.refreshLocalExtension(extensionId);
+            }
+            catch (error) {
+              extensionData.localSourcePath = previousSourcePath;
+              await extensionsStorageStore.saveStorageData();
+              throw error;
+            }
+
+            const refreshed = extensionsStorageStore
+              .extensionsData
+              .installedExtensions[extensionId];
+
+            if (!refreshed || refreshed.version !== expectedVersion) {
+              if (refreshed) {
+                refreshed.localSourcePath = previousSourcePath;
+              }
+
+              await extensionsStorageStore.saveStorageData();
+            }
+          },
+        });
+
+        logInitTrace(`bundled Universal Library sync: ${result}`);
+      },
       'Failed to initialize extensions:',
     );
     runInBackgroundWithTrace(

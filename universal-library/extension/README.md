@@ -24,6 +24,10 @@ The live workspace remains inside Sigma's sandbox. It calls the existing `Univer
 
 ## Setup
 
+The custom Sigma build bundles this extension and offers to install it through Sigma's normal extension flow on first launch. Accepting the managed dependency prompt downloads the checksum-verified `ulib` release for the current platform. Cancelling leaves Sigma usable and does not claim bundled ownership.
+
+Bundled extension updates follow the same validation, rollback, activation, and managed-dependency paths as a local extension refresh. A manually installed same-ID development copy is not overwritten, a disabled bundled extension remains disabled, and an intentionally uninstalled bundled extension stays uninstalled.
+
 For supported Linux x64 and Windows x64 installations, Sigma downloads, checksum-verifies, extracts, and reuses the managed `ulib` binary declared by the extension.
 
 Then:
