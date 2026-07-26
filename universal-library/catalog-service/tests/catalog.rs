@@ -44,8 +44,7 @@ fn adding_the_same_root_is_idempotent() {
 #[test]
 fn roots_must_exist_and_be_directories() {
     let directory = tempdir().expect("temp directory");
-    let catalog = Catalog::open(directory.path().join("catalog.sqlite3"))
-        .expect("open catalog");
+    let catalog = Catalog::open(directory.path().join("catalog.sqlite3")).expect("open catalog");
 
     let missing = catalog.add_root(directory.path().join("missing"), None);
     assert!(missing.is_err());
@@ -59,8 +58,7 @@ fn roots_must_exist_and_be_directories() {
 #[test]
 fn creates_virtual_collections_without_filesystem_changes() {
     let directory = tempdir().expect("temp directory");
-    let catalog = Catalog::open(directory.path().join("catalog.sqlite3"))
-        .expect("open catalog");
+    let catalog = Catalog::open(directory.path().join("catalog.sqlite3")).expect("open catalog");
 
     let album = catalog
         .create_collection("Album 03", "manual")
@@ -96,5 +94,8 @@ fn creates_a_consistent_backup() {
     assert_eq!(health.schema_version, 1);
     assert_eq!(health.root_count, 1);
     assert_eq!(health.collection_count, 1);
-    assert!(catalog.backup(&backup).is_err(), "existing backups are not overwritten");
+    assert!(
+        catalog.backup(&backup).is_err(),
+        "existing backups are not overwritten"
+    );
 }

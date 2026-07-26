@@ -1,6 +1,5 @@
 use std::{
-    env,
-    fs,
+    env, fs,
     path::{Path, PathBuf},
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
@@ -61,8 +60,9 @@ impl Catalog {
     pub fn open(path: impl AsRef<Path>) -> Result<Self> {
         let path = path.as_ref().to_path_buf();
         if let Some(parent) = path.parent() {
-            fs::create_dir_all(parent)
-                .with_context(|| format!("failed to create catalog directory {}", parent.display()))?;
+            fs::create_dir_all(parent).with_context(|| {
+                format!("failed to create catalog directory {}", parent.display())
+            })?;
         }
 
         let connection = Connection::open(&path)
@@ -99,13 +99,20 @@ impl Catalog {
         })
     }
 
-    pub fn add_root(&self, path: impl AsRef<Path>, display_name: Option<&str>) -> Result<RootRecord> {
+    pub fn add_root(
+        &self,
+        path: impl AsRef<Path>,
+        display_name: Option<&str>,
+    ) -> Result<RootRecord> {
         let canonical_path = fs::canonicalize(path.as_ref())
             .with_context(|| format!("library root does not exist: {}", path.as_ref().display()))?;
         let metadata = fs::metadata(&canonical_path)
             .with_context(|| format!("failed to inspect root {}", canonical_path.display()))?;
         if !metadata.is_dir() {
-            bail!("library root must be a directory: {}", canonical_path.display());
+            bail!(
+                "library root must be a directory: {}",
+                canonical_path.display()
+            );
         }
 
         let path_string = canonical_path.to_string_lossy().into_owned();
@@ -200,8 +207,9 @@ impl Catalog {
             bail!("backup destination already exists: {}", output.display());
         }
         if let Some(parent) = output.parent() {
-            fs::create_dir_all(parent)
-                .with_context(|| format!("failed to create backup directory {}", parent.display()))?;
+            fs::create_dir_all(parent).with_context(|| {
+                format!("failed to create backup directory {}", parent.display())
+            })?;
         }
 
         let mut destination = Connection::open(output)
@@ -235,7 +243,9 @@ impl Catalog {
             bail!("unsupported count table: {table}");
         }
         self.connection
-            .query_row(&format!("SELECT COUNT(*) FROM {table}"), [], |row| row.get(0))
+            .query_row(&format!("SELECT COUNT(*) FROM {table}"), [], |row| {
+                row.get(0)
+            })
             .with_context(|| format!("failed to count {table}"))
     }
 
@@ -275,9 +285,8 @@ pub fn default_database_path() -> Result<PathBuf> {
             .join("universal-library")
             .join("catalog.sqlite3"));
     }
-    let home = env::var_os("HOME").context(
-        "cannot resolve catalog path: set ULIB_DATABASE or provide HOME/XDG_DATA_HOME",
-    )?;
+    let home = env::var_os("HOME")
+        .context("cannot resolve catalog path: set ULIB_DATABASE or provide HOME/XDG_DATA_HOME")?;
     Ok(PathBuf::from(home)
         .join(".local")
         .join("share")
