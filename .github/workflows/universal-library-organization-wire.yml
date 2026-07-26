@@ -1,6 +1,7 @@
 name: Wire Universal Library organization layer
 
 on:
+  workflow_dispatch:
   push:
     branches:
       - feat/universal-library-organization
