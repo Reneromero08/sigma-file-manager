@@ -4,7 +4,7 @@ use anyhow::Result;
 use clap::{Parser, Subcommand};
 use serde::Serialize;
 use serde_json::json;
-use universal_library_catalog::{Catalog, default_database_path};
+use universal_library_catalog::{Catalog, ScanOptions, default_database_path};
 
 #[derive(Debug, Parser)]
 #[command(name = "ulib", version, about = "Universal Library local catalog CLI")]
@@ -50,6 +50,17 @@ enum RootCommand {
     },
     /// List configured roots.
     List,
+    /// Recursively index a registered root without modifying source files.
+    Scan {
+        /// Root ID or registered root path.
+        reference: String,
+        /// Include dot-prefixed entries.
+        #[arg(long)]
+        include_hidden: bool,
+        /// Include default cache, dependency, VCS, and build directories.
+        #[arg(long)]
+        include_ignored: bool,
+    },
 }
 
 #[derive(Debug, Subcommand)]
@@ -89,7 +100,7 @@ fn main() -> ExitCode {
 fn run() -> Result<()> {
     let cli = Cli::parse();
     let database = cli.database.unwrap_or(default_database_path()?);
-    let catalog = Catalog::open(database)?;
+    let mut catalog = Catalog::open(database)?;
 
     match cli.command {
         Command::Init | Command::Health => print_success(catalog.health()?),
@@ -98,6 +109,17 @@ fn run() -> Result<()> {
                 print_success(catalog.add_root(path, name.as_deref())?)
             }
             RootCommand::List => print_success(catalog.list_roots()?),
+            RootCommand::Scan {
+                reference,
+                include_hidden,
+                include_ignored,
+            } => print_success(catalog.scan_root(
+                &reference,
+                ScanOptions {
+                    include_hidden,
+                    include_ignored,
+                },
+            )?),
         },
         Command::Collection { command } => match command {
             CollectionCommand::Create { name, kind } => {
