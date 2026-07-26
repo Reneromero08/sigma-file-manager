@@ -34,7 +34,11 @@ export type BundledExtensionSyncOptions = {
   markerStore: BundledExtensionMarkerStore;
   getInstalledExtension: () => InstalledExtensionData | undefined;
   installFromSource: (sourcePath: string) => Promise<void>;
-  refreshFromSource: (extensionId: string, sourcePath: string) => Promise<void>;
+  refreshFromSource: (
+    extensionId: string,
+    sourcePath: string,
+    expectedVersion: string,
+  ) => Promise<void>;
 };
 
 export function createLocalStorageBundledExtensionMarkerStore(
@@ -107,7 +111,7 @@ export async function syncBundledExtension(
     return 'current';
   }
 
-  await refreshFromSource(extensionId, sourcePath);
+  await refreshFromSource(extensionId, sourcePath, preview.version);
   const refreshed = getInstalledExtension();
 
   if (!refreshed || refreshed.version !== preview.version) {
