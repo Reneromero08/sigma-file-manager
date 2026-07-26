@@ -327,6 +327,13 @@ fn non_empty_parent(path: &Path) -> Option<&Path> {
         .filter(|parent| !parent.as_os_str().is_empty())
 }
 
+fn now_ms() -> Result<i64> {
+    let duration = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .context("system clock is before the Unix epoch")?;
+    i64::try_from(duration.as_millis()).context("timestamp exceeds SQLite integer range")
+}
+
 #[cfg(test)]
 mod tests {
     use super::non_empty_parent;
@@ -340,11 +347,4 @@ mod tests {
             Some(Path::new("state"))
         );
     }
-}
-
-fn now_ms() -> Result<i64> {
-    let duration = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .context("system clock is before the Unix epoch")?;
-    i64::try_from(duration.as_millis()).context("timestamp exceeds SQLite integer range")
 }
