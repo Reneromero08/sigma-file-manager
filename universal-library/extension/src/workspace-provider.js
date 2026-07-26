@@ -44,6 +44,11 @@ async function getSnapshot(request) {
   };
 }
 
+async function getCollectionItems(request) {
+  const collection = requiredString(request.collection, 'Collection');
+  return runCatalog(['collection', 'items', collection]);
+}
+
 async function tagAsset(request) {
   const asset = requiredString(request.asset, 'Asset path');
   const tag = requiredString(request.tag, 'Tag name');
@@ -66,6 +71,8 @@ export async function handleWorkspaceRequest(request = {}) {
   switch (request.action) {
     case 'snapshot':
       return getSnapshot(request);
+    case 'collection-items':
+      return getCollectionItems(request);
     case 'tag-asset':
       return tagAsset(request);
     case 'add-to-collection':
