@@ -882,7 +882,7 @@ export async function mount(container, context) {
         await loadSnapshot();
       }
       if (buttonId === 'configure') {
-        await sigma.commands.executeCommand('configure-catalog');
+        await sigma.commands.executeCommand('catalog-health');
         await loadSnapshot();
       }
       if (buttonId === 'density') {
