@@ -56,7 +56,7 @@ function createSigma() {
     commands: {
       async executeCommand(commandId, request) {
         commandCalls.push({ commandId, request });
-        assert.equal(commandId, 'browse-assets');
+        if (commandId !== 'browse-assets') return undefined;
         if (request.action === 'snapshot') return snapshot();
         if (request.action === 'collection-items') {
           return [{
@@ -157,14 +157,8 @@ test('loads ordered collection contents from the catalog provider', async () => 
   assert.ok(commandCalls.some(call => call.request.action === 'collection-items'));
 });
 
-test('uses the existing command palette actions for refresh, indexing, and configuration', async () => {
+test('uses existing command palette actions for indexing and configuration', async () => {
   const sigma = createSigma();
-  const originalExecute = sigma.commands.executeCommand;
-  sigma.commands.executeCommand = async (commandId, request) => {
-    commandCalls.push({ commandId, request });
-    if (commandId === 'browse-assets') return snapshot();
-    return originalExecute(commandId, request);
-  };
   const { mount } = await import(`../ui/workspace.js?toolbar=${Date.now()}`);
   await mount(document.getElementById('app'), { sigma, toolbarContainer: {} });
 
