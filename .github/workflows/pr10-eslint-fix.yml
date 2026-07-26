@@ -1,0 +1,36 @@
+name: Apply PR10 ESLint fixes
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - feat/universal-library-bundled-extension
+    paths:
+      - ".github/workflows/pr10-eslint-fix.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/universal-library-bundled-extension
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.16.0
+          cache: npm
+      - run: npm ci
+      - run: npx eslint src/composables/use-init.ts src/modules/extensions/bundled-extension-sync.ts src/modules/extensions/__tests__/bundled-extension-sync.test.ts --fix
+      - run: npm run lint:eslint:check && npm run ts && npm run test:unit:run
+      - run: |
+          rm .github/workflows/pr10-eslint-fix.yml
+          rm diagnostics/pr10-eslint.txt
+          rmdir diagnostics || true
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .github/workflows/pr10-eslint-fix.yml diagnostics src/composables/use-init.ts src/modules/extensions
+          git commit -m "style: apply canonical bundled extension formatting"
+          git push origin HEAD:feat/universal-library-bundled-extension
