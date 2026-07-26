@@ -13,37 +13,156 @@ on:
       - ".github/workflows/universal-library-checks.yml"
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  diagnose-pr10:
-    if: github.event_name == 'pull_request' && github.head_ref == 'feat/universal-library-bundled-extension'
+  extension-and-schema:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 15
+
     steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: feat/universal-library-bundled-extension
-          fetch-depth: 0
-      - uses: actions/setup-node@v4
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
         with:
           node-version: 24.16.0
           cache: npm
-      - run: npm ci
-      - run: |
-          mkdir -p diagnostics
-          set +e
-          npm run ts > diagnostics/pr10-ts.txt 2>&1
-          echo $? > diagnostics/pr10-ts.status
-          npm run lint:check > diagnostics/pr10-lint.txt 2>&1
-          echo $? > diagnostics/pr10-lint.status
-          npm run test:unit:run > diagnostics/pr10-tests.txt 2>&1
-          echo $? > diagnostics/pr10-tests.status
-          set -e
-      - run: |
-          git show origin/product:.github/workflows/universal-library-checks.yml > .github/workflows/universal-library-checks.yml
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add .github/workflows/universal-library-checks.yml diagnostics
-          git commit -m "test: capture remaining PR10 validation report"
-          git push origin HEAD:feat/universal-library-bundled-extension
+
+      - name: Install locked test dependencies
+        run: npm ci
+
+      - name: Check extension JavaScript syntax
+        run: |
+          node --check universal-library/extension/src/index.js
+          node --check universal-library/extension/src/catalog-client.js
+          node --check universal-library/extension/src/catalog-bridge.js
+          node --check universal-library/extension/src/workspace-provider.js
+          node --check universal-library/extension/ui/workspace.js
+
+      - name: Run extension tests
+        run: node --test universal-library/extension/tests/*.node.mjs
+
+      - name: Validate extension manifest contract
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+
+          const path = 'universal-library/extension/package.json';
+          const manifest = JSON.parse(fs.readFileSync(path, 'utf8'));
+          const required = ['id', 'name', 'version', 'repository', 'license', 'extensionType', 'permissions', 'engines'];
+          const missing = required.filter(key => manifest[key] === undefined);
+
+          if (missing.length > 0) {
+            throw new Error(`Missing manifest fields: ${missing.join(', ')}`);
+          }
+          if (manifest.extensionType !== 'api') {
+            throw new Error('Universal Library must remain an API extension.');
+          }
+          if (!manifest.permissions.includes('fs.read')) {
+            throw new Error('Read permission is required for user-approved roots.');
+          }
+          if (!manifest.permissions.includes('shell')) {
+            throw new Error('Shell permission is required for the user-selected ulib bridge.');
+          }
+          if (manifest.permissions.includes('fs.write')) {
+            throw new Error('Universal Library must not request source filesystem write permission.');
+          }
+          if (manifest.main !== 'src/index.js') {
+            throw new Error('Unexpected extension entry point.');
+          }
+          NODE
+
+      - name: Apply catalog migration to an empty database
+        run: |
+          python3 <<'PY'
+          import pathlib
+          import sqlite3
+
+          migration = pathlib.Path('universal-library/catalog/0001_initial.sql').read_text()
+          connection = sqlite3.connect(':memory:')
+          connection.executescript(migration)
+
+          expected_tables = {
+              'schema_migrations',
+              'roots',
+              'assets',
+              'locations',
+              'tags',
+              'asset_tags',
+              'collections',
+              'collection_items',
+              'asset_metadata',
+              'asset_relations',
+              'previews',
+              'saved_queries',
+              'analysis_jobs',
+              'audit_log',
+          }
+          actual_tables = {
+              row[0]
+              for row in connection.execute(
+                  "SELECT name FROM sqlite_master WHERE type = 'table'"
+              )
+          }
+          missing = expected_tables - actual_tables
+          if missing:
+              raise SystemExit(f'Migration did not create tables: {sorted(missing)}')
+
+          version = connection.execute('PRAGMA user_version').fetchone()[0]
+          if version != 1:
+              raise SystemExit(f'Expected user_version 1, got {version}')
+
+          migration_row = connection.execute(
+              'SELECT version FROM schema_migrations'
+          ).fetchone()
+          if migration_row != (1,):
+              raise SystemExit(f'Unexpected migration record: {migration_row}')
+          PY
+
+  catalog-service:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    defaults:
+      run:
+        working-directory: universal-library/catalog-service
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Cache Rust build
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: universal-library/catalog-service
+
+      - name: Check formatting
+        run: cargo fmt -- --check
+
+      - name: Check catalog service
+        run: cargo clippy --all-targets -- -D warnings
+
+      - name: Run catalog tests
+        run: cargo test
+
+      - name: Smoke test JSON CLI
+        run: |
+          database="$RUNNER_TEMP/universal-library.sqlite3"
+          cargo run --quiet -- --database "$database" init | tee "$RUNNER_TEMP/init.json"
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          payload = json.loads(Path(os.environ['RUNNER_TEMP']).joinpath('init.json').read_text())
+          assert payload['ok'] is True
+          assert payload['data']['status'] == 'ok'
+          assert payload['data']['schemaVersion'] == 1
+          PY

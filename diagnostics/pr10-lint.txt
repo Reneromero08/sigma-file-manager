@@ -1,0 +1,20 @@
+
+> sigma-file-manager@2.2.0 lint:check
+> run-s lint:*:check
+
+
+> sigma-file-manager@2.2.0 lint:eslint:check
+> eslint . --max-warnings 0
+
+
+/home/runner/work/sigma-file-manager/sigma-file-manager/src/modules/extensions/bundled-extension-sync.ts
+  24:1  error  Expected indentation of 4 spaces  @stylistic/indent-binary-ops
+  25:1  error  Expected indentation of 4 spaces  @stylistic/indent-binary-ops
+  26:1  error  Expected indentation of 4 spaces  @stylistic/indent-binary-ops
+  27:1  error  Expected indentation of 4 spaces  @stylistic/indent-binary-ops
+  28:1  error  Expected indentation of 4 spaces  @stylistic/indent-binary-ops
+
+✖ 5 problems (5 errors, 0 warnings)
+  5 errors and 0 warnings potentially fixable with the `--fix` option.
+
+ERROR: "lint:eslint:check" exited with 1.
