@@ -444,6 +444,7 @@ export function useInit() {
               if (refreshed) {
                 refreshed.localSourcePath = previousSourcePath;
               }
+
               await extensionsStorageStore.saveStorageData();
             }
           },
