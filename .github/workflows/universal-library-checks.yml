@@ -33,7 +33,7 @@ jobs:
         run: node --check universal-library/extension/src/index.js
 
       - name: Run extension bootstrap tests
-        run: node --test universal-library/extension/tests/*.test.mjs
+        run: node --test universal-library/extension/tests/bootstrap.node.mjs
 
       - name: Validate extension manifest contract
         run: |
