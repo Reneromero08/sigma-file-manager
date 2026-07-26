@@ -25,10 +25,17 @@ function shellResult(payload, code = 0) {
     : { code, stdout: '', stderr: JSON.stringify(payload) };
 }
 
+function formatMessage(template, params = {}) {
+  return Object.entries(params).reduce(
+    (message, [key, value]) => message.replaceAll(`{${key}}`, String(value)),
+    template,
+  );
+}
+
 globalThis.sigma = {
   i18n: {
-    extensionT(_key, _params, fallback) {
-      return fallback;
+    extensionT(_key, params, fallback) {
+      return formatMessage(fallback, params);
     },
   },
   settings: {
