@@ -30,10 +30,13 @@ jobs:
           node-version: 24.16.0
 
       - name: Check extension JavaScript syntax
-        run: node --check universal-library/extension/src/index.js
+        run: |
+          node --check universal-library/extension/src/index.js
+          node --check universal-library/extension/src/catalog-client.js
+          node --check universal-library/extension/src/catalog-bridge.js
 
-      - name: Run extension bootstrap tests
-        run: node --test universal-library/extension/tests/bootstrap.node.mjs
+      - name: Run extension tests
+        run: node --test universal-library/extension/tests/*.node.mjs
 
       - name: Validate extension manifest contract
         run: |
@@ -49,13 +52,16 @@ jobs:
             throw new Error(`Missing manifest fields: ${missing.join(', ')}`);
           }
           if (manifest.extensionType !== 'api') {
-            throw new Error('Universal Library bootstrap must remain an API extension.');
+            throw new Error('Universal Library must remain an API extension.');
           }
           if (!manifest.permissions.includes('fs.read')) {
             throw new Error('Read permission is required for user-approved roots.');
           }
+          if (!manifest.permissions.includes('shell')) {
+            throw new Error('Shell permission is required for the user-selected ulib bridge.');
+          }
           if (manifest.permissions.includes('fs.write')) {
-            throw new Error('Foundation extension must not request filesystem write permission.');
+            throw new Error('Universal Library must not request source filesystem write permission.');
           }
           if (manifest.main !== 'src/index.js') {
             throw new Error('Unexpected extension entry point.');

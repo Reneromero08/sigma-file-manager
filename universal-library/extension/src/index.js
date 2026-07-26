@@ -1,3 +1,14 @@
+import {
+  addSelectedEntriesToCollection,
+  configureCatalog,
+  configureCatalogDatabasePath,
+  scanLibraryRoots,
+  showCatalogBrowser,
+  showCatalogHealth,
+  tagSelectedEntries,
+  useDefaultCatalogDatabase,
+} from './catalog-bridge.js';
+
 const ROOTS_KEY = 'library-roots';
 const SEED_ENTRIES_KEY = 'seed-entries';
 const CATALOG_VERSION_KEY = 'catalog-schema-version';
@@ -148,6 +159,15 @@ async function copySelectedEntries() {
   });
 }
 
+function registerCommand(id, title, handler, description) {
+  disposables.push(
+    sigma.commands.registerCommand(
+      { id, title, ...(description ? { description } : {}) },
+      handler,
+    ),
+  );
+}
+
 export async function activate() {
   try {
     await sigma.i18n.mergeFromPath('locales');
@@ -166,37 +186,73 @@ export async function activate() {
       order: 25,
       url: 'ui/index.html',
     }),
-    sigma.commands.registerCommand(
-      {
-        id: 'add-root',
-        title: t('commands.addRoot', 'Universal Library: Add folder'),
-        description: t('commands.addRootDescription', 'Grant read-only access to a folder without importing it.'),
-      },
-      addLibraryRoot,
-    ),
-    sigma.commands.registerCommand(
-      {
-        id: 'show-roots',
-        title: t('commands.showRoots', 'Universal Library: Show folders'),
-      },
-      showLibraryRoots,
-    ),
-    sigma.commands.registerCommand(
-      {
-        id: 'add-selected',
-        title: t('commands.addSelected', 'Universal Library: Add selected items'),
-        description: t('commands.addSelectedDescription', 'Record selected paths without moving or copying files.'),
-      },
-      () => addSelectedEntries(),
-    ),
-    sigma.commands.registerCommand(
-      {
-        id: 'copy-selected',
-        title: t('commands.copySelected', 'Universal Library: Copy selected items'),
-        description: t('commands.copySelectedDescription', 'Place selected paths on the native file clipboard.'),
-      },
-      copySelectedEntries,
-    ),
+  );
+
+  registerCommand(
+    'add-root',
+    t('commands.addRoot', 'Universal Library: Add folder'),
+    addLibraryRoot,
+    t('commands.addRootDescription', 'Grant read-only access to a folder without importing it.'),
+  );
+  registerCommand(
+    'show-roots',
+    t('commands.showRoots', 'Universal Library: Show folders'),
+    showLibraryRoots,
+  );
+  registerCommand(
+    'add-selected',
+    t('commands.addSelected', 'Universal Library: Add selected items'),
+    () => addSelectedEntries(),
+    t('commands.addSelectedDescription', 'Record selected paths without moving or copying files.'),
+  );
+  registerCommand(
+    'copy-selected',
+    t('commands.copySelected', 'Universal Library: Copy selected items'),
+    copySelectedEntries,
+    t('commands.copySelectedDescription', 'Place selected paths on the native file clipboard.'),
+  );
+  registerCommand(
+    'configure-catalog',
+    t('commands.configureCatalog', 'Universal Library: Configure catalog executable'),
+    configureCatalog,
+  );
+  registerCommand(
+    'configure-database',
+    t('commands.configureDatabase', 'Universal Library: Choose catalog database'),
+    configureCatalogDatabasePath,
+  );
+  registerCommand(
+    'use-default-database',
+    t('commands.useDefaultDatabase', 'Universal Library: Use default catalog database'),
+    useDefaultCatalogDatabase,
+  );
+  registerCommand(
+    'catalog-health',
+    t('commands.catalogHealth', 'Universal Library: Show catalog status'),
+    showCatalogHealth,
+  );
+  registerCommand(
+    'scan-roots',
+    t('commands.scanRoots', 'Universal Library: Index all folders'),
+    scanLibraryRoots,
+  );
+  registerCommand(
+    'browse-assets',
+    t('commands.browseAssets', 'Universal Library: Browse indexed assets'),
+    showCatalogBrowser,
+  );
+  registerCommand(
+    'tag-selected',
+    t('commands.tagSelected', 'Universal Library: Tag selected files'),
+    tagSelectedEntries,
+  );
+  registerCommand(
+    'add-selected-to-collection',
+    t('commands.addSelectedToCollection', 'Universal Library: Add selected files to collection'),
+    addSelectedEntriesToCollection,
+  );
+
+  disposables.push(
     sigma.contextMenu.registerItem(
       {
         id: 'add-selected',
@@ -204,12 +260,31 @@ export async function activate() {
         icon: 'library-big',
         group: 'universal-library',
         order: 10,
-        when: {
-          selectionType: 'any',
-          entryType: 'any',
-        },
+        when: { selectionType: 'any', entryType: 'any' },
       },
       addSelectedEntries,
+    ),
+    sigma.contextMenu.registerItem(
+      {
+        id: 'tag-selected',
+        title: t('contextMenu.tagSelected', 'Tag in Universal Library'),
+        icon: 'tag',
+        group: 'universal-library',
+        order: 20,
+        when: { selectionType: 'any', entryType: 'file' },
+      },
+      tagSelectedEntries,
+    ),
+    sigma.contextMenu.registerItem(
+      {
+        id: 'add-selected-to-collection',
+        title: t('contextMenu.addToCollection', 'Add to Universal Library collection'),
+        icon: 'library-big',
+        group: 'universal-library',
+        order: 30,
+        when: { selectionType: 'any', entryType: 'file' },
+      },
+      addSelectedEntriesToCollection,
     ),
   );
 }
