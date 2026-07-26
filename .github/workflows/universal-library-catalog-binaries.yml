@@ -1,0 +1,199 @@
+name: Universal Library catalog binaries
+
+on:
+  pull_request:
+    paths:
+      - "universal-library/catalog-service/**"
+      - ".github/workflows/universal-library-catalog-binaries.yml"
+  workflow_dispatch:
+  push:
+    branches:
+      - product
+    paths:
+      - "universal-library/catalog-service/RELEASE_VERSION"
+    tags:
+      - "ulib-v*"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ulib-binaries-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build ${{ matrix.platform }}-${{ matrix.arch }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            platform: linux
+            arch: x64
+            executable: ulib
+            archive: ulib-linux-x64.tar.gz
+            format: tar.gz
+          - os: windows-latest
+            platform: windows
+            arch: x64
+            executable: ulib.exe
+            archive: ulib-windows-x64.zip
+            format: zip
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust build
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: universal-library/catalog-service
+
+      - name: Read catalog version
+        id: crate
+        shell: python
+        run: |
+          import os
+          from pathlib import Path
+          import tomllib
+
+          cargo = Path("universal-library/catalog-service/Cargo.toml")
+          version = tomllib.loads(cargo.read_text(encoding="utf-8"))["package"]["version"]
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
+              output.write(f"version={version}\n")
+
+      - name: Test deterministic packager
+        run: python universal-library/catalog-service/scripts/test_package_release.py
+
+      - name: Test catalog service
+        run: cargo test --locked --manifest-path universal-library/catalog-service/Cargo.toml
+
+      - name: Build release binary
+        run: cargo build --locked --release --manifest-path universal-library/catalog-service/Cargo.toml
+
+      - name: Smoke test Linux binary
+        if: matrix.platform == 'linux'
+        run: universal-library/catalog-service/target/release/ulib --version
+
+      - name: Smoke test Windows binary
+        if: matrix.platform == 'windows'
+        shell: pwsh
+        run: ./universal-library/catalog-service/target/release/ulib.exe --version
+
+      - name: Package deterministic release archive
+        run: >-
+          python universal-library/catalog-service/scripts/package_release.py
+          --executable universal-library/catalog-service/target/release/${{ matrix.executable }}
+          --output dist/${{ matrix.archive }}
+          --format ${{ matrix.format }}
+          --platform ${{ matrix.platform }}
+          --arch ${{ matrix.arch }}
+          --version ${{ steps.crate.outputs.version }}
+          --archive-name ${{ matrix.executable }}
+
+      - name: Upload release archive
+        uses: actions/upload-artifact@v4
+        with:
+          name: ulib-${{ matrix.platform }}-${{ matrix.arch }}
+          path: |
+            dist/${{ matrix.archive }}
+            dist/${{ matrix.archive }}.json
+          if-no-files-found: error
+          retention-days: 14
+
+  release:
+    name: Publish catalog release
+    if: github.event_name == 'push'
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: Check out release source
+        uses: actions/checkout@v4
+
+      - name: Download platform archives
+        uses: actions/download-artifact@v4
+        with:
+          pattern: ulib-*
+          path: dist
+          merge-multiple: true
+
+      - name: Validate versions and aggregate release metadata
+        id: release
+        shell: bash
+        run: |
+          set -euo pipefail
+          crate_version="$(python - <<'PY'
+          from pathlib import Path
+          import tomllib
+          print(tomllib.loads(Path('universal-library/catalog-service/Cargo.toml').read_text())['package']['version'])
+          PY
+          )"
+          marker_version="$(tr -d '[:space:]' < universal-library/catalog-service/RELEASE_VERSION)"
+          if [[ -z "$marker_version" || "$marker_version" != "$crate_version" ]]; then
+            echo "Release marker $marker_version does not match crate version $crate_version" >&2
+            exit 1
+          fi
+
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            tag="$GITHUB_REF_NAME"
+            tag_version="${tag#ulib-v}"
+            if [[ "$tag_version" != "$crate_version" ]]; then
+              echo "Tag version $tag_version does not match crate version $crate_version" >&2
+              exit 1
+            fi
+          else
+            tag="ulib-v$crate_version"
+          fi
+
+          (
+            cd dist
+            sha256sum *.tar.gz *.zip | sort -k2 > SHA256SUMS
+          )
+
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          dist = Path('dist')
+          assets = [json.loads(path.read_text()) for path in sorted(dist.glob('*.json'))]
+          payload = {
+              'schemaVersion': 1,
+              'assets': assets,
+          }
+          (dist / 'release-manifest.json').write_text(
+              json.dumps(payload, indent=2, sort_keys=True) + '\n',
+              encoding='utf-8',
+          )
+          PY
+
+          echo "version=$crate_version" >> "$GITHUB_OUTPUT"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
+      - name: Create or update GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.release.outputs.tag }}
+          VERSION: ${{ steps.release.outputs.version }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" dist/* --clobber
+          else
+            gh release create "$TAG" dist/* \
+              --target "$GITHUB_SHA" \
+              --title "Universal Library Catalog $VERSION" \
+              --notes "Portable Universal Library catalog binaries for Linux x64 and Windows x64. Verify archives against SHA256SUMS before manual installation."
+          fi
