@@ -86,7 +86,7 @@ describe('syncBundledExtension', () => {
       preview: { extensionId, version: '0.4.0' },
       markerStore: markers,
       getInstalledExtension: () => undefined,
-      installFromSource: vi.fn(async () => {}),
+      installFromSource: vi.fn(async () => undefined),
       refreshFromSource: vi.fn(),
     });
 
@@ -171,7 +171,7 @@ describe('syncBundledExtension', () => {
     });
 
     expect(result).toBe('refreshed');
-    expect(refreshFromSource).toHaveBeenCalledWith(extensionId, sourcePath);
+    expect(refreshFromSource).toHaveBeenCalledWith(extensionId, sourcePath, '0.4.0');
     expect(installed.enabled).toBe(false);
   });
 
