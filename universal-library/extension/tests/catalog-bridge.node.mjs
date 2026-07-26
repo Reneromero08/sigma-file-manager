@@ -185,7 +185,7 @@ beforeEach(() => {
 test('configures the executable and verifies catalog health', async () => {
   settings.clear();
   openFileSelection = '/home/raul/bin/ulib';
-  commandResponder = args => {
+  commandResponder = (args) => {
     assert.deepEqual(args, ['health']);
     return {
       ok: true,
