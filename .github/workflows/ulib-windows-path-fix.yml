@@ -1,0 +1,86 @@
+name: Apply ulib Windows path search fix
+
+on:
+  push:
+    branches:
+      - feat/universal-library-binary-artifacts
+    paths:
+      - ".github/workflows/ulib-windows-path-fix.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: windows-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out feature branch
+        uses: actions/checkout@v4
+        with:
+          ref: feat/universal-library-binary-artifacts
+
+      - name: Normalize indexed path separators in searches
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('universal-library/catalog-service/src/organize.rs')
+          text = path.read_text()
+          old = '''            let pattern = format!("%{}%", escape_like(text));
+                      sql.push_str(
+                          " AND (
+                              a.canonical_name LIKE ? ESCAPE '\\\\'
+                              OR EXISTS(
+                                  SELECT 1 FROM locations searched
+                                  WHERE searched.asset_id = a.id
+                                    AND searched.path LIKE ? ESCAPE '\\\\'
+                              )
+                          )",
+                      );
+                      values.push(Value::Text(pattern.clone()));
+                      values.push(Value::Text(pattern));
+          '''
+          new = '''            let name_pattern = format!("%{}%", escape_like(text));
+                      let normalized_path_text = text.replace('\\\\', "/");
+                      let path_pattern = format!("%{}%", escape_like(&normalized_path_text));
+                      sql.push_str(
+                          " AND (
+                              a.canonical_name LIKE ? ESCAPE '\\\\'
+                              OR EXISTS(
+                                  SELECT 1 FROM locations searched
+                                  WHERE searched.asset_id = a.id
+                                    AND REPLACE(searched.path, '\\\\', '/') LIKE ? ESCAPE '\\\\'
+                              )
+                          )",
+                      );
+                      values.push(Value::Text(name_pattern));
+                      values.push(Value::Text(path_pattern));
+          '''
+          if old not in text:
+              raise SystemExit('asset search block was not found')
+          path.write_text(text.replace(old, new, 1))
+          PY
+
+      - name: Install Rust checks
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Validate Windows fix
+        shell: bash
+        run: |
+          cargo fmt --manifest-path universal-library/catalog-service/Cargo.toml
+          cargo clippy --manifest-path universal-library/catalog-service/Cargo.toml --all-targets -- -D warnings
+          cargo test --locked --manifest-path universal-library/catalog-service/Cargo.toml
+
+      - name: Commit validated fix
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add universal-library/catalog-service/src/organize.rs
+          git commit -m "fix: normalize catalog path separators in asset search"
+          git push origin HEAD:feat/universal-library-binary-artifacts
