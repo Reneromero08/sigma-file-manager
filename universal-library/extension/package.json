@@ -1,0 +1,48 @@
+{
+  "$schema": "../../packages/api/manifest.schema.json",
+  "id": "reneromero08.universal-library",
+  "name": "Universal Library",
+  "version": "0.1.0",
+  "publisher": {
+    "name": "Reneromero08",
+    "url": "https://github.com/Reneromero08"
+  },
+  "repository": "https://github.com/Reneromero08/sigma-file-manager",
+  "license": "GPL-3.0-or-later",
+  "categories": [
+    "File Management",
+    "Media",
+    "Search & Filter",
+    "Productivity"
+  ],
+  "tags": [
+    "asset management",
+    "collections",
+    "creative files",
+    "samples",
+    "media",
+    "linux"
+  ],
+  "extensionType": "api",
+  "main": "src/index.js",
+  "permissions": [
+    "sidebar",
+    "commands",
+    "contextMenu",
+    "fs.read",
+    "notifications",
+    "dialogs",
+    "clipboard"
+  ],
+  "activationEvents": [
+    "onStartup"
+  ],
+  "engines": {
+    "sigmaFileManager": ">=2.2.0"
+  },
+  "scripts": {
+    "check": "node --check src/index.js"
+  },
+  "type": "module",
+  "private": true
+}
