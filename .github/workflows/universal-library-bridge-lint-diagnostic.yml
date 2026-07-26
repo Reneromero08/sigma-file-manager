@@ -1,6 +1,7 @@
 name: Capture Universal Library bridge lint
 
 on:
+  workflow_dispatch:
   push:
     branches:
       - feat/universal-library-sigma-bridge
