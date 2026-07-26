@@ -2,7 +2,7 @@
   "$schema": "../../packages/api/manifest.schema.json",
   "id": "reneromero08.universal-library",
   "name": "Universal Library",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "publisher": {
     "name": "Reneromero08",
     "url": "https://github.com/Reneromero08"
@@ -51,7 +51,7 @@
     {
       "id": "universal-library-catalog",
       "name": "Universal Library Catalog",
-      "version": "0.1.0",
+      "version": "0.2.0",
       "executable": "ulib",
       "repository": "https://github.com/Reneromero08/sigma-file-manager",
       "platforms": [
@@ -64,8 +64,8 @@
           "arch": [
             "x64"
           ],
-          "downloadUrl": "https://github.com/Reneromero08/sigma-file-manager/releases/download/ulib-v0.1.0/ulib-linux-x64.tar.gz",
-          "integrity": "sha256:f4c2975a21ee82dc22bdbef925e2e1415346525c8fbdcae7465643246679140f",
+          "downloadUrl": "https://github.com/Reneromero08/sigma-file-manager/releases/download/ulib-v0.2.0/ulib-linux-x64.tar.gz",
+          "integrity": "sha256:2b75dba1cdf05e9b43dfd222d32b6565599b3f0d3523320b618318bfda905c83",
           "archive": true,
           "executable": "ulib"
         },
@@ -74,8 +74,8 @@
           "arch": [
             "x64"
           ],
-          "downloadUrl": "https://github.com/Reneromero08/sigma-file-manager/releases/download/ulib-v0.1.0/ulib-windows-x64.zip",
-          "integrity": "sha256:c664efae59f560767eabe867f88e0a06c8a64e05c6ad59ce10c15c37b43281b7",
+          "downloadUrl": "https://github.com/Reneromero08/sigma-file-manager/releases/download/ulib-v0.2.0/ulib-windows-x64.zip",
+          "integrity": "sha256:d40f00a71c090b83358db97ddfa84174fa90a6bbc134b3e259d374101311a088",
           "archive": true,
           "executable": "ulib.exe"
         }

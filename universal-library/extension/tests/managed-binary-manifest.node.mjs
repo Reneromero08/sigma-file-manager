@@ -6,7 +6,7 @@ import { dirname, join } from 'node:path';
 
 const testsDir = dirname(fileURLToPath(import.meta.url));
 const extensionDir = dirname(testsDir);
-const releaseTag = 'ulib-v0.1.0';
+const releaseTag = 'ulib-v0.2.0';
 
 function readJson(path) {
   return JSON.parse(readFileSync(path, 'utf8'));
@@ -29,7 +29,7 @@ const checksums = new Map(
 
 await test('extension declares the exact published managed catalog assets', () => {
   assert.equal(releaseManifest.schemaVersion, 1);
-  assert.equal(manifest.version, '0.4.0');
+  assert.equal(manifest.version, '0.5.0');
   assert.equal(manifest.permissions.includes('shell'), true);
   assert.equal(manifest.permissions.includes('fs.write'), false);
   assert.equal(manifest.binaries.length, 1);
@@ -37,7 +37,7 @@ await test('extension declares the exact published managed catalog assets', () =
   const binary = manifest.binaries[0];
   assert.equal(binary.id, 'universal-library-catalog');
   assert.equal(binary.name, 'Universal Library Catalog');
-  assert.equal(binary.version, '0.1.0');
+  assert.equal(binary.version, '0.2.0');
   assert.equal(binary.executable, 'ulib');
   assert.deepEqual(binary.platforms, ['linux', 'windows']);
   assert.equal(binary.assets.length, 2);

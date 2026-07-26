@@ -1,3 +1,11 @@
+import {
+  analysisMap,
+  createWaveformSvg,
+  enrichAssetsWithAudio,
+  formatDuration,
+  formatSampleRate,
+} from './audio-ui.js';
+
 const MEDIA_FILTERS = [
   ['all', 'All'],
   ['audio', 'Audio'],
@@ -275,6 +283,13 @@ function installStyles(container) {
     }
     .ul-grid.is-compact .ul-asset-preview { height: 82px; }
     .ul-kind-glyph { color: hsl(267 90% 80%); font-size: 29px; font-weight: 750; text-shadow: 0 8px 22px hsl(267 80% 55% / 0.4); }
+    .ul-waveform { width: calc(100% - 18px); height: 62px; overflow: visible; }
+    .ul-waveform path { fill: hsl(267 88% 72% / 0.78); filter: drop-shadow(0 5px 12px hsl(267 80% 45% / 0.35)); }
+    .ul-inspector-waveform { width: calc(100% - 28px); height: 92px; overflow: visible; }
+    .ul-inspector-waveform path { fill: hsl(267 90% 76% / 0.82); filter: drop-shadow(0 8px 18px hsl(267 80% 45% / 0.4)); }
+    .ul-audio-facts { display: flex; align-items: center; gap: 5px; overflow: hidden; }
+    .ul-audio-fact { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .ul-audio-fact + .ul-audio-fact::before { margin-right: 5px; color: var(--ul-border); content: '·'; }
     .ul-offline-badge { position: absolute; top: 8px; right: 8px; padding: 3px 6px; border-radius: 999px; color: hsl(3 90% 80%); background: hsl(3 65% 25% / 0.75); font-size: 8px; text-transform: uppercase; }
     .ul-asset-body { padding: 10px 11px 11px; }
     .ul-asset-name { overflow: hidden; font-size: 11px; font-weight: 650; text-overflow: ellipsis; white-space: nowrap; }
@@ -426,6 +441,7 @@ export async function mount(container, context) {
   const state = {
     snapshot: null,
     assets: [],
+    audioByAsset: new Map(),
     selectedAssetId: null,
     query: '',
     kind: 'all',
@@ -547,7 +563,15 @@ export async function mount(container, context) {
     }
 
     const hero = element('div', 'ul-inspector-hero');
-    hero.append(element('div', 'ul-kind-glyph', KIND_GLYPHS[asset.mediaKind] ?? '·'));
+    const inspectorWaveform = createWaveformSvg(
+      document,
+      asset.audioAnalysis,
+      'ul-inspector-waveform',
+    );
+    hero.append(
+      inspectorWaveform
+      ?? element('div', 'ul-kind-glyph', KIND_GLYPHS[asset.mediaKind] ?? '·'),
+    );
     const name = element('h2', '', asset.canonicalName);
     const path = element('div', 'ul-inspector-path', asset.primaryPath ?? 'No current file location');
     const actions = element('div', 'ul-inspector-actions');
@@ -564,7 +588,15 @@ export async function mount(container, context) {
     collection.type = 'button';
     collection.dataset.action = 'collect-asset';
     collection.disabled = !asset.primaryPath || !(state.snapshot?.collections?.length);
-    actions.append(copy, tag, collection);
+    const analyze = element(
+      'button',
+      'ul-button',
+      asset.audioAnalysis ? 'Refresh waveform' : 'Analyze audio',
+    );
+    analyze.type = 'button';
+    analyze.dataset.action = 'analyze-audio';
+    analyze.disabled = asset.mediaKind !== 'audio' || !asset.primaryPath;
+    actions.append(copy, tag, collection, analyze);
 
     const details = element('div', 'ul-detail-list');
     const rows = [
@@ -574,6 +606,15 @@ export async function mount(container, context) {
       ['Modified', formatTimestamp(asset.modifiedAtNs)],
       ['Asset ID', asset.id],
     ];
+    if (asset.audioAnalysis) {
+      rows.splice(1, 0,
+        ['Duration', formatDuration(asset.audioAnalysis.durationMs)],
+        ['Sample rate', formatSampleRate(asset.audioAnalysis.sampleRateHz)],
+        ['Channels', asset.audioAnalysis.channels],
+        ['Peak', asset.audioAnalysis.peak.toFixed(3)],
+        ['RMS', asset.audioAnalysis.rms.toFixed(3)],
+      );
+    }
     if (asset.sectionName) rows.splice(1, 0, ['Section', asset.sectionName]);
     if (asset.note) rows.splice(2, 0, ['Note', asset.note]);
     for (const [label, value] of rows) {
@@ -626,17 +667,28 @@ export async function mount(container, context) {
       card.type = 'button';
       card.dataset.assetId = asset.id;
       const preview = element('div', 'ul-asset-preview');
-      preview.append(element('div', 'ul-kind-glyph', KIND_GLYPHS[asset.mediaKind] ?? '·'));
+      const waveform = createWaveformSvg(document, asset.audioAnalysis);
+      preview.append(
+        waveform ?? element('div', 'ul-kind-glyph', KIND_GLYPHS[asset.mediaKind] ?? '·'),
+      );
       if (!asset.isOnline) preview.append(element('span', 'ul-offline-badge', 'offline'));
       const body = element('div', 'ul-asset-body');
       body.append(
         element('div', 'ul-asset-name', asset.canonicalName),
         (() => {
           const meta = element('div', 'ul-asset-meta');
-          meta.append(
-            element('span', 'ul-kind-label', asset.mediaKind),
-            element('span', '', asset.sizeBytes == null ? '' : formatBytes(asset.sizeBytes)),
-          );
+          meta.append(element('span', 'ul-kind-label', asset.mediaKind));
+          if (asset.audioAnalysis) {
+            const audioFacts = element('span', 'ul-audio-facts');
+            audioFacts.append(
+              element('span', 'ul-audio-fact', formatDuration(asset.audioAnalysis.durationMs)),
+              element('span', 'ul-audio-fact', formatSampleRate(asset.audioAnalysis.sampleRateHz)),
+            );
+            meta.append(audioFacts);
+          }
+          else {
+            meta.append(element('span', '', asset.sizeBytes == null ? '' : formatBytes(asset.sizeBytes)));
+          }
           return meta;
         })(),
       );
@@ -679,7 +731,10 @@ export async function mount(container, context) {
         limit: 500,
       });
       state.snapshot = snapshot;
-      if (!state.activeCollectionId) state.assets = snapshot.assets;
+      state.audioByAsset = analysisMap(snapshot.audioAnalyses);
+      if (!state.activeCollectionId) {
+        state.assets = enrichAssetsWithAudio(snapshot.assets, state.audioByAsset);
+      }
       state.error = null;
     }
     catch (error) {
@@ -704,7 +759,10 @@ export async function mount(container, context) {
     render();
     try {
       const items = await execute({ action: 'collection-items', collection: collectionId });
-      state.assets = items.map(normalizeCollectionAsset);
+      state.assets = enrichAssetsWithAudio(
+        items.map(normalizeCollectionAsset),
+        state.audioByAsset,
+      );
       state.error = null;
     }
     catch (error) {
@@ -852,6 +910,28 @@ export async function mount(container, context) {
     }
     else if (action === 'tag-asset') openModal('tag');
     else if (action === 'collect-asset') openModal('collection');
+    else if (action === 'analyze-audio' && asset?.primaryPath) {
+      try {
+        await execute({
+          action: 'analyze-audio',
+          asset: asset.primaryPath,
+          points: 256,
+        });
+        sigma.ui.showNotification({
+          title: 'Audio waveform analyzed',
+          description: asset.canonicalName,
+          type: 'success',
+        });
+        await loadSnapshot();
+      }
+      catch (error) {
+        sigma.ui.showNotification({
+          title: 'Audio analysis failed',
+          description: error instanceof Error ? error.message : String(error),
+          type: 'error',
+        });
+      }
+    }
   });
   shell.querySelector('[data-action="new-collection"]').addEventListener('click', () => openModal('new-collection'));
   shell.querySelector('[data-action="modal-cancel"]').addEventListener('click', closeModal);
@@ -872,6 +952,7 @@ export async function mount(container, context) {
     [
       sigma.ui.button({ id: 'refresh', label: 'Refresh', variant: 'secondary' }),
       sigma.ui.button({ id: 'index', label: 'Index folders', variant: 'primary' }),
+      sigma.ui.button({ id: 'analyze-audio', label: 'Analyze audio', variant: 'secondary' }),
       sigma.ui.button({ id: 'configure', label: 'Catalog', variant: 'secondary' }),
       sigma.ui.button({ id: 'density', label: state.compact ? 'Comfortable' : 'Compact', variant: 'secondary' }),
     ],
@@ -879,6 +960,28 @@ export async function mount(container, context) {
       if (buttonId === 'refresh') await loadSnapshot();
       if (buttonId === 'index') {
         await sigma.commands.executeCommand('scan-roots');
+        await loadSnapshot();
+      }
+      if (buttonId === 'analyze-audio') {
+        try {
+          const report = await execute({
+            action: 'analyze-missing-audio',
+            limit: 500,
+            points: 256,
+          });
+          sigma.ui.showNotification({
+            title: 'Audio analysis complete',
+            description: `${report.analyzed ?? 0} analyzed · ${report.issues?.length ?? 0} issue(s)`,
+            type: report.issues?.length ? 'warning' : 'success',
+          });
+        }
+        catch (error) {
+          sigma.ui.showNotification({
+            title: 'Audio analysis failed',
+            description: error instanceof Error ? error.message : String(error),
+            type: 'error',
+          });
+        }
         await loadSnapshot();
       }
       if (buttonId === 'configure') {
