@@ -15,132 +15,24 @@ jobs:
   patch:
     runs-on: ubuntu-latest
     timeout-minutes: 20
-
     steps:
-      - name: Check out feature branch
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           ref: feat/universal-library-bundled-extension
-
-      - name: Patch startup initialization
-        run: |
-          python3 - <<'PY'
-          from pathlib import Path
-
-          path = Path('src/composables/use-init.ts')
-          text = path.read_text(encoding='utf-8')
-
-          import_marker = "import { useExtensionsStore } from '@/stores/runtime/extensions';\n"
-          imports = (
-              "import { useExtensionsStore } from '@/stores/runtime/extensions';\n"
-              "import { useExtensionsStorageStore } from '@/stores/storage/extensions';\n"
-              "import { bootstrapBundledUniversalLibrary } from '@/modules/extensions/bundled-extension-bootstrap';\n"
-              "import { BUNDLED_UNIVERSAL_LIBRARY_ID } from '@/modules/extensions/bundled-extension-sync';\n"
-          )
-          if text.count(import_marker) != 1:
-              raise SystemExit('extensions store import marker was not unique')
-          text = text.replace(import_marker, imports, 1)
-
-          store_marker = "  const extensionsStore = useExtensionsStore();\n"
-          stores = (
-              "  const extensionsStore = useExtensionsStore();\n"
-              "  const extensionsStorageStore = useExtensionsStorageStore();\n"
-          )
-          if text.count(store_marker) != 1:
-              raise SystemExit('extensions store initialization marker was not unique')
-          text = text.replace(store_marker, stores, 1)
-
-          old_block = '''    runInBackgroundWithTrace('background:extensionsStore.init', () => extensionsStore.init({
-                shouldFetchRemoteMetadata: isMainWindow,
-              }), 'Failed to initialize extensions store:');
-          '''
-          new_block = '''    runInBackgroundWithTrace('background:extensionsStore.init', async () => {
-                await extensionsStore.init({
-                  shouldFetchRemoteMetadata: isMainWindow,
-                });
-
-                if (!isMainWindow) {
-                  return;
-                }
-
-                const result = await bootstrapBundledUniversalLibrary({
-                  getInstalledExtension: () => (
-                    extensionsStorageStore.extensionsData.installedExtensions[
-                      BUNDLED_UNIVERSAL_LIBRARY_ID
-                    ]
-                  ),
-                  installLocalExtension: sourcePath => (
-                    extensionsStore.installLocalExtension(sourcePath)
-                  ),
-                  refreshLocalExtensionFromSource: async (
-                    extensionId,
-                    sourcePath,
-                    expectedVersion,
-                  ) => {
-                    const extensionData = extensionsStorageStore
-                      .extensionsData
-                      .installedExtensions[extensionId];
-
-                    if (!extensionData?.isLocal) {
-                      throw new Error(`Bundled extension "${extensionId}" is not a local extension`);
-                    }
-
-                    const previousSourcePath = extensionData.localSourcePath;
-                    extensionData.localSourcePath = sourcePath;
-
-                    try {
-                      await extensionsStore.refreshLocalExtension(extensionId);
-                    }
-                    catch (error) {
-                      extensionData.localSourcePath = previousSourcePath;
-                      await extensionsStorageStore.saveStorageData();
-                      throw error;
-                    }
-
-                    const refreshed = extensionsStorageStore
-                      .extensionsData
-                      .installedExtensions[extensionId];
-
-                    if (!refreshed || refreshed.version !== expectedVersion) {
-                      if (refreshed) {
-                        refreshed.localSourcePath = previousSourcePath;
-                      }
-                      await extensionsStorageStore.saveStorageData();
-                    }
-                  },
-                });
-
-                logInitTrace(`bundled Universal Library sync: ${result}`);
-              }, 'Failed to initialize extensions store:');
-          '''
-          if text.count(old_block) != 1:
-              raise SystemExit('extensions background initialization block was not found')
-          path.write_text(text.replace(old_block, new_block, 1), encoding='utf-8')
-          PY
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: 24.16.0
           cache: npm
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Validate bootstrap patch
+      - run: python3 scripts/apply-bundled-universal-library-bootstrap.py
+      - run: npm ci
+      - run: npx eslint src/composables/use-init.ts src/modules/extensions/bundled-extension-bootstrap.ts src/modules/extensions/bundled-extension-sync.ts src/modules/extensions/__tests__/bundled-extension-sync.test.ts --fix
+      - run: npm run ts && npm run lint:check && npm run test:unit:run
+      - name: Commit validated bootstrap
         run: |
-          npm run ts
-          npm run lint:check
-          npm run test:unit:run
-
-      - name: Commit validated startup integration
-        run: |
-          set -euo pipefail
           rm .github/workflows/universal-library-bundled-bootstrap.yml
+          rm scripts/apply-bundled-universal-library-bootstrap.py
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add \
-            .github/workflows/universal-library-bundled-bootstrap.yml \
-            src/composables/use-init.ts
+          git add .github/workflows/universal-library-bundled-bootstrap.yml scripts/apply-bundled-universal-library-bootstrap.py src/composables/use-init.ts src/modules/extensions
           git commit -m "feat: bootstrap bundled Universal Library extension"
           git push origin HEAD:feat/universal-library-bundled-extension
