@@ -23,12 +23,12 @@ Metadata schema v1 contains:
 - SHA-256 digest;
 - archive size.
 
-Tagged releases additionally contain:
+Published releases additionally contain:
 
 - `SHA256SUMS`
 - `release-manifest.json`
 
-The aggregate manifest is intended to become the source for Sigma's managed-binary declaration. A later integration PR can consume it without inventing checksums or archive names.
+The aggregate manifest is intended to become the source for Sigma's managed-binary declaration. A later integration can consume it without inventing checksums or archive names.
 
 ## Validation on pull requests
 
@@ -45,21 +45,45 @@ Pull-request and manual-dispatch runs never create GitHub releases.
 
 ## Creating a release
 
-The crate version in `Cargo.toml` is authoritative. For version `0.1.0`:
+Three versions must match exactly:
+
+1. `[package].version` in `Cargo.toml`;
+2. the text in `RELEASE_VERSION`;
+3. the `ulib-v*` tag suffix, when a tag initiates the workflow.
+
+The release job fails closed when any present version differs.
+
+### Reviewed product release
+
+Changing `RELEASE_VERSION` in a pull request is the normal release authorization. Once the reviewed marker reaches `product`, the workflow:
+
+1. builds Linux and Windows binaries from that exact product commit;
+2. creates the tag `ulib-v<version>` when it does not exist;
+3. publishes or updates the matching GitHub release.
+
+For the first release, `RELEASE_VERSION` contains:
+
+```text
+0.1.0
+```
+
+Future catalog releases must update `Cargo.toml`, `Cargo.lock` when needed, and `RELEASE_VERSION` in the same reviewed change.
+
+### Existing tag release
+
+An existing matching tag can also be pushed directly:
 
 ```bash
 git tag ulib-v0.1.0
 git push origin ulib-v0.1.0
 ```
 
-The release job fails closed when the tag suffix does not exactly match the crate version.
-
-For a matching tag it:
+For either release path the job:
 
 1. downloads the independently built Linux and Windows artifacts;
 2. generates `SHA256SUMS`;
 3. aggregates platform metadata into `release-manifest.json`;
-4. creates the GitHub release, or replaces assets when rerunning the same tag.
+4. creates the GitHub release, or replaces assets when rerunning the same version.
 
 ## Determinism
 
@@ -74,7 +98,7 @@ For a matching tag it:
 
 The packager tests create each format twice and require byte-identical output.
 
-The Rust compiler output itself is not claimed to be reproducible across arbitrary toolchains. `Cargo.lock`, the workflow runner, and the release tag provide the build custody for a given release.
+The Rust compiler output itself is not claimed to be reproducible across arbitrary toolchains. `Cargo.lock`, the workflow runner, the product commit, and release metadata provide the build custody for a given release.
 
 ## Local packaging test
 
@@ -97,6 +121,6 @@ python universal-library/catalog-service/scripts/package_release.py \
 
 ## Safety
 
-The release workflow has read-only repository permissions during build jobs. `contents: write` is granted only to the tag-gated release job.
+The release workflow has read-only repository permissions during build jobs. `contents: write` is granted only to the push-gated release job after both platform builds succeed.
 
 No release workflow modifies the Universal Library catalog or any indexed user files.
