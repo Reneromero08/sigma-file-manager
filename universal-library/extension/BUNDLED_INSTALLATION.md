@@ -1,6 +1,6 @@
 # Bundled Universal Library installation
 
-The custom Sigma build packages the Universal Library runtime as a Tauri resource at:
+The custom Sigma build packages Universal Library `0.4.0` as a Tauri resource at:
 
 ```text
 bundled-extensions/reneromero08.universal-library
