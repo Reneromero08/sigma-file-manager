@@ -94,7 +94,7 @@ globalThis.sigma = {
 
 const extension = await import('../src/index.js');
 
-await test('activation registers the workspace and commands without write access', async () => {
+await test('activation registers the workspace and catalog bridge without filesystem write access', async () => {
   await extension.activate();
 
   assert.equal(stored.get('catalog-schema-version'), 1);
@@ -102,9 +102,25 @@ await test('activation registers the workspace and commands without write access
   assert.equal(pages[0].url, 'ui/index.html');
   assert.deepEqual(
     [...commands.keys()].sort(),
-    ['add-root', 'add-selected', 'copy-selected', 'show-roots'],
+    [
+      'add-root',
+      'add-selected',
+      'add-selected-to-collection',
+      'browse-assets',
+      'catalog-health',
+      'configure-catalog',
+      'configure-database',
+      'copy-selected',
+      'scan-roots',
+      'show-roots',
+      'tag-selected',
+      'use-default-database',
+    ],
   );
-  assert.equal(contextMenus.has('add-selected'), true);
+  assert.deepEqual(
+    [...contextMenus.keys()].sort(),
+    ['add-selected', 'add-selected-to-collection', 'tag-selected'],
+  );
 });
 
 await test('adding a root is read-only and idempotent', async () => {
