@@ -65,7 +65,10 @@ describe('syncBundledExtension', () => {
     const result = await syncBundledExtension({
       extensionId,
       sourcePath,
-      preview: { extensionId, version: '0.4.0' },
+      preview: {
+        extensionId,
+        version: '0.4.0',
+      },
       markerStore: markers,
       getInstalledExtension: () => installed,
       installFromSource,
@@ -83,7 +86,10 @@ describe('syncBundledExtension', () => {
     const result = await syncBundledExtension({
       extensionId,
       sourcePath,
-      preview: { extensionId, version: '0.4.0' },
+      preview: {
+        extensionId,
+        version: '0.4.0',
+      },
       markerStore: markers,
       getInstalledExtension: () => undefined,
       installFromSource: vi.fn(async () => undefined),
@@ -100,7 +106,10 @@ describe('syncBundledExtension', () => {
     const result = await syncBundledExtension({
       extensionId,
       sourcePath,
-      preview: { extensionId, version: '0.4.0' },
+      preview: {
+        extensionId,
+        version: '0.4.0',
+      },
       markerStore: markerStore('managed'),
       getInstalledExtension: () => undefined,
       installFromSource,
@@ -117,7 +126,10 @@ describe('syncBundledExtension', () => {
     const result = await syncBundledExtension({
       extensionId,
       sourcePath,
-      preview: { extensionId, version: '0.4.0' },
+      preview: {
+        extensionId,
+        version: '0.4.0',
+      },
       markerStore: markerStore(),
       getInstalledExtension: () => installedExtension({
         localSourcePath: '/home/raul/dev/universal-library',
@@ -136,7 +148,10 @@ describe('syncBundledExtension', () => {
     const result = await syncBundledExtension({
       extensionId,
       sourcePath,
-      preview: { extensionId, version: '0.4.0' },
+      preview: {
+        extensionId,
+        version: '0.4.0',
+      },
       markerStore: markerStore('managed'),
       getInstalledExtension: () => installedExtension(),
       installFromSource: vi.fn(),
@@ -163,7 +178,10 @@ describe('syncBundledExtension', () => {
     const result = await syncBundledExtension({
       extensionId,
       sourcePath,
-      preview: { extensionId, version: '0.4.0' },
+      preview: {
+        extensionId,
+        version: '0.4.0',
+      },
       markerStore: markerStore('managed'),
       getInstalledExtension: () => installed,
       installFromSource: vi.fn(),
@@ -179,7 +197,10 @@ describe('syncBundledExtension', () => {
     await expect(syncBundledExtension({
       extensionId,
       sourcePath,
-      preview: { extensionId: 'other.extension', version: '0.4.0' },
+      preview: {
+        extensionId: 'other.extension',
+        version: '0.4.0',
+      },
       markerStore: markerStore(),
       getInstalledExtension: () => undefined,
       installFromSource: vi.fn(),
