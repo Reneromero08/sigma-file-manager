@@ -321,6 +321,7 @@ const sigma = {
       writeFile: (path, data) => callHost('fs.scoped.writeFile', path, data),
       readDir: path => callHost('fs.scoped.readDir', path),
       exists: path => callHost('fs.scoped.exists', path),
+      toAssetUrl: path => callHost('fs.scoped.toAssetUrl', path),
     },
   },
   ui: {

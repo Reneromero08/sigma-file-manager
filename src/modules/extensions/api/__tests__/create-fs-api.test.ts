@@ -8,9 +8,14 @@ import {
 import type { ExtensionPermission } from '@/types/extension';
 import type { ExtensionContext } from '@/modules/extensions/api/extension-context';
 
-const { invokeAsExtensionMock, hasScopedAccessMock } = vi.hoisted(() => ({
+const { invokeAsExtensionMock, hasScopedAccessMock, convertFileSrcMock } = vi.hoisted(() => ({
   invokeAsExtensionMock: vi.fn(),
   hasScopedAccessMock: vi.fn(),
+  convertFileSrcMock: vi.fn(),
+}));
+
+vi.mock('@tauri-apps/api/core', () => ({
+  convertFileSrc: convertFileSrcMock,
 }));
 
 vi.mock('@tauri-apps/plugin-dialog', () => ({
@@ -66,6 +71,7 @@ describe('createFsAPI', () => {
   beforeEach(() => {
     invokeAsExtensionMock.mockReset();
     hasScopedAccessMock.mockReset();
+    convertFileSrcMock.mockReset();
   });
 
   it('allows generic exists for extension storage paths', async () => {
@@ -173,6 +179,33 @@ describe('createFsAPI', () => {
     expect(invokeAsExtensionMock).toHaveBeenCalledWith('test.extension', 'read_file_binary', {
       path: '/extension-storage/entries/image.png',
     });
+  });
+
+  it('creates a scoped streamable asset URL only after read authorization', async () => {
+    const context = createContext(['fs.read']);
+    hasScopedAccessMock.mockResolvedValueOnce(true);
+    convertFileSrcMock.mockReturnValueOnce('asset://localhost/library/kick.wav');
+    const fsApi = createFsAPI(context);
+
+    await expect(fsApi.scoped.toAssetUrl('/library/kick.wav'))
+      .resolves.toBe('asset://localhost/library/kick.wav');
+
+    expect(hasScopedAccessMock).toHaveBeenCalledWith(
+      'test.extension',
+      '/library/kick.wav',
+      'read',
+    );
+    expect(convertFileSrcMock).toHaveBeenCalledWith('/library/kick.wav');
+  });
+
+  it('rejects scoped asset URLs outside approved directories', async () => {
+    const context = createContext(['fs.read']);
+    hasScopedAccessMock.mockResolvedValueOnce(false);
+    const fsApi = createFsAPI(context);
+
+    await expect(fsApi.scoped.toAssetUrl('/private/secret.wav'))
+      .rejects.toThrow(/not in scoped directories/);
+    expect(convertFileSrcMock).not.toHaveBeenCalled();
   });
 
   it('allows importing a file selected from a dialog', async () => {

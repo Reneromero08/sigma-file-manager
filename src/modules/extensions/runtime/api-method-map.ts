@@ -46,6 +46,7 @@ export function createExtensionApiMethodMap(api: SigmaExtensionAPI): ExtensionAp
     'fs.scoped.writeFile': (path, data) => api.fs.scoped.writeFile(path as string, data as Uint8Array),
     'fs.scoped.readDir': path => api.fs.scoped.readDir(path as string),
     'fs.scoped.exists': path => api.fs.scoped.exists(path as string),
+    'fs.scoped.toAssetUrl': path => api.fs.scoped.toAssetUrl(path as string),
     'ui.showNotification': options => api.ui.showNotification(options as never),
     'ui.showDialog': options => api.ui.showDialog(options as never),
     'ui.copyText': text => api.ui.copyText(text as string),
