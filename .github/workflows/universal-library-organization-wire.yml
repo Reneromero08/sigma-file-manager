@@ -1,5 +1,6 @@
 name: Wire Universal Library organization layer
 
+# One-shot branch workflow. Remove after it commits validated source changes.
 on:
   workflow_dispatch:
   push:
