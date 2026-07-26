@@ -16,7 +16,7 @@ permissions:
   contents: read
 
 jobs:
-  validate:
+  extension-and-schema:
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
@@ -107,4 +107,50 @@ jobs:
           ).fetchone()
           if migration_row != (1,):
               raise SystemExit(f'Unexpected migration record: {migration_row}')
+          PY
+
+  catalog-service:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    defaults:
+      run:
+        working-directory: universal-library/catalog-service
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Cache Rust build
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: universal-library/catalog-service
+
+      - name: Check formatting
+        run: cargo fmt -- --check
+
+      - name: Check catalog service
+        run: cargo clippy --all-targets -- -D warnings
+
+      - name: Run catalog tests
+        run: cargo test
+
+      - name: Smoke test JSON CLI
+        run: |
+          database="$RUNNER_TEMP/universal-library.sqlite3"
+          cargo run --quiet -- --database "$database" init | tee "$RUNNER_TEMP/init.json"
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          payload = json.loads(Path(os.environ['RUNNER_TEMP']).joinpath('init.json').read_text())
+          assert payload['ok'] is True
+          assert payload['data']['status'] == 'ok'
+          assert payload['data']['schemaVersion'] == 1
           PY
