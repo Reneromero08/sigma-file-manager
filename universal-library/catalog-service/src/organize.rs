@@ -148,19 +148,21 @@ impl Catalog {
             .map(str::trim)
             .filter(|v| !v.is_empty())
         {
-            let pattern = format!("%{}%", escape_like(text));
+            let name_pattern = format!("%{}%", escape_like(text));
+            let normalized_path_text = text.replace('\\', "/");
+            let path_pattern = format!("%{}%", escape_like(&normalized_path_text));
             sql.push_str(
                 " AND (
                     a.canonical_name LIKE ? ESCAPE '\\'
                     OR EXISTS(
                         SELECT 1 FROM locations searched
                         WHERE searched.asset_id = a.id
-                          AND searched.path LIKE ? ESCAPE '\\'
+                          AND REPLACE(searched.path, '\\', '/') LIKE ? ESCAPE '\\'
                     )
                 )",
             );
-            values.push(Value::Text(pattern.clone()));
-            values.push(Value::Text(pattern));
+            values.push(Value::Text(name_pattern));
+            values.push(Value::Text(path_pattern));
         }
 
         sql.push_str(" ORDER BY a.modified_at_ns DESC, a.canonical_name COLLATE NOCASE LIMIT ?");
