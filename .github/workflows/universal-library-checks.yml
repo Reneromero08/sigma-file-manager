@@ -18,7 +18,7 @@ permissions:
 jobs:
   extension-and-schema:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
 
     steps:
       - name: Check out repository
@@ -28,6 +28,10 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 24.16.0
+          cache: npm
+
+      - name: Install locked test dependencies
+        run: npm ci
 
       - name: Check extension JavaScript syntax
         run: |
