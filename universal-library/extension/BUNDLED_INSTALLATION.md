@@ -24,3 +24,5 @@ Lifecycle rules:
 - a failed refresh restores the previous source path and extension snapshot.
 
 The managed `ulib` archive remains independently versioned and SHA-256 verified before extraction. No source-file write permission is introduced by bundling the extension.
+
+This boundary is the installable-alpha contract: future creative adapters may update the bundled extension and managed catalog independently without relocating indexed files or resetting the catalog.
