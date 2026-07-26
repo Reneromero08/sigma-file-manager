@@ -30,7 +30,7 @@ jobs:
 
       - name: Commit lockfile
         run: |
-          if git diff --quiet -- universal-library/catalog-service/Cargo.lock; then
+          if [ -z "$(git status --porcelain -- universal-library/catalog-service/Cargo.lock)" ]; then
             echo "Cargo.lock is already current."
             exit 0
           fi
