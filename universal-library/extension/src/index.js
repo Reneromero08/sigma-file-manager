@@ -8,6 +8,7 @@ import {
   tagSelectedEntries,
   useDefaultCatalogDatabase,
 } from './catalog-bridge.js';
+import { handleWorkspaceRequest } from './workspace-provider.js';
 
 const ROOTS_KEY = 'library-roots';
 const SEED_ENTRIES_KEY = 'seed-entries';
@@ -159,6 +160,13 @@ async function copySelectedEntries() {
   });
 }
 
+async function browseAssetsCommand(options) {
+  if (options?.workspace === true) {
+    return handleWorkspaceRequest(options);
+  }
+  return showCatalogBrowser();
+}
+
 function registerCommand(id, title, handler, description) {
   disposables.push(
     sigma.commands.registerCommand(
@@ -184,7 +192,7 @@ export async function activate() {
       title: t('sidebar.title', 'Universal Library'),
       icon: 'library-big',
       order: 25,
-      url: 'ui/index.html',
+      url: 'ui/workspace.js',
     }),
   );
 
@@ -239,7 +247,7 @@ export async function activate() {
   registerCommand(
     'browse-assets',
     t('commands.browseAssets', 'Universal Library: Browse indexed assets'),
-    showCatalogBrowser,
+    browseAssetsCommand,
   );
   registerCommand(
     'tag-selected',
