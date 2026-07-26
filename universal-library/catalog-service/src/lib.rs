@@ -9,6 +9,10 @@ use rusqlite::{Connection, OptionalExtension, Row, backup::Backup, params};
 use serde::Serialize;
 use uuid::Uuid;
 
+mod indexer;
+
+pub use indexer::{ScanIssue, ScanOptions, ScanReport};
+
 const CURRENT_SCHEMA_VERSION: i64 = 1;
 const INITIAL_MIGRATION: &str = include_str!("../../catalog/0001_initial.sql");
 
