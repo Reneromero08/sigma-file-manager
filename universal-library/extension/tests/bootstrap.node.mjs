@@ -94,7 +94,7 @@ globalThis.sigma = {
 
 const extension = await import('../src/index.js');
 
-await test('activation registers the live workspace and catalog bridge without filesystem write access', async () => {
+await test('activation registers the live workspace and managed catalog bridge without filesystem write access', async () => {
   await extension.activate();
 
   assert.equal(stored.get('catalog-schema-version'), 1);
@@ -115,6 +115,7 @@ await test('activation registers the live workspace and catalog bridge without f
       'show-roots',
       'tag-selected',
       'use-default-database',
+      'use-managed-catalog',
     ],
   );
   assert.deepEqual(
