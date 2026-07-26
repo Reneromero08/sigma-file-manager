@@ -59,7 +59,7 @@ pub struct HealthRecord {
 impl Catalog {
     pub fn open(path: impl AsRef<Path>) -> Result<Self> {
         let path = path.as_ref().to_path_buf();
-        if let Some(parent) = path.parent() {
+        if let Some(parent) = non_empty_parent(&path) {
             fs::create_dir_all(parent).with_context(|| {
                 format!("failed to create catalog directory {}", parent.display())
             })?;
@@ -206,7 +206,7 @@ impl Catalog {
         if output.exists() {
             bail!("backup destination already exists: {}", output.display());
         }
-        if let Some(parent) = output.parent() {
+        if let Some(parent) = non_empty_parent(output) {
             fs::create_dir_all(parent).with_context(|| {
                 format!("failed to create backup directory {}", parent.display())
             })?;
@@ -320,6 +320,26 @@ fn collection_from_row(row: &Row<'_>) -> rusqlite::Result<CollectionRecord> {
         created_at_ms: row.get(7)?,
         updated_at_ms: row.get(8)?,
     })
+}
+
+fn non_empty_parent(path: &Path) -> Option<&Path> {
+    path.parent()
+        .filter(|parent| !parent.as_os_str().is_empty())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::non_empty_parent;
+    use std::path::Path;
+
+    #[test]
+    fn relative_catalog_paths_do_not_require_an_empty_directory() {
+        assert_eq!(non_empty_parent(Path::new("catalog.sqlite3")), None);
+        assert_eq!(
+            non_empty_parent(Path::new("state/catalog.sqlite3")),
+            Some(Path::new("state"))
+        );
+    }
 }
 
 fn now_ms() -> Result<i64> {
