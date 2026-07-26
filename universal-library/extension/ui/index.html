@@ -1,0 +1,497 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Universal Library</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      --bg: #090b10;
+      --panel: rgba(19, 23, 32, 0.76);
+      --panel-strong: rgba(27, 32, 43, 0.94);
+      --line: rgba(255, 255, 255, 0.08);
+      --line-strong: rgba(255, 255, 255, 0.16);
+      --text: #f5f7fb;
+      --muted: #979fad;
+      --accent: #a8ff78;
+      --accent-2: #78ffd6;
+      --radius: 18px;
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      width: 100%;
+      min-height: 100%;
+      margin: 0;
+      background:
+        radial-gradient(circle at 18% 0%, rgba(120, 255, 214, 0.12), transparent 34%),
+        radial-gradient(circle at 100% 16%, rgba(168, 255, 120, 0.09), transparent 28%),
+        var(--bg);
+      color: var(--text);
+    }
+
+    button, input { font: inherit; }
+
+    .app {
+      display: grid;
+      min-height: 100vh;
+      grid-template-columns: 236px minmax(0, 1fr);
+    }
+
+    .rail {
+      position: sticky;
+      top: 0;
+      display: flex;
+      height: 100vh;
+      flex-direction: column;
+      gap: 22px;
+      padding: 22px 16px;
+      border-right: 1px solid var(--line);
+      background: rgba(8, 10, 15, 0.72);
+      backdrop-filter: blur(24px);
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 11px;
+      padding: 0 7px;
+      font-weight: 720;
+      letter-spacing: -0.02em;
+    }
+
+    .mark {
+      display: grid;
+      width: 32px;
+      height: 32px;
+      place-items: center;
+      border: 1px solid rgba(168, 255, 120, 0.35);
+      border-radius: 11px;
+      background: linear-gradient(145deg, rgba(168, 255, 120, 0.18), rgba(120, 255, 214, 0.04));
+      box-shadow: inset 0 0 24px rgba(168, 255, 120, 0.08);
+      color: var(--accent);
+    }
+
+    .eyebrow {
+      color: var(--muted);
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+    }
+
+    nav { display: grid; gap: 4px; }
+
+    .nav-label {
+      margin: 10px 9px 5px;
+      color: #646c79;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+
+    .nav-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 9px 10px;
+      border: 1px solid transparent;
+      border-radius: 11px;
+      color: #aeb5c0;
+      font-size: 13px;
+    }
+
+    .nav-item.active {
+      border-color: rgba(168, 255, 120, 0.16);
+      background: rgba(168, 255, 120, 0.08);
+      color: var(--text);
+    }
+
+    .nav-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #596170;
+    }
+
+    .nav-item.active .nav-dot {
+      background: var(--accent);
+      box-shadow: 0 0 12px rgba(168, 255, 120, 0.8);
+    }
+
+    .rail-note {
+      margin-top: auto;
+      padding: 12px;
+      border: 1px solid var(--line);
+      border-radius: 13px;
+      background: rgba(255, 255, 255, 0.025);
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1.55;
+    }
+
+    main { min-width: 0; padding: 22px 26px 42px; }
+
+    .topbar {
+      display: grid;
+      grid-template-columns: minmax(260px, 1fr) auto;
+      align-items: center;
+      gap: 16px;
+      margin-bottom: 26px;
+    }
+
+    .search {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      height: 42px;
+      padding: 0 14px;
+      border: 1px solid var(--line);
+      border-radius: 13px;
+      background: rgba(255, 255, 255, 0.035);
+      color: var(--muted);
+    }
+
+    .search input {
+      width: 100%;
+      border: 0;
+      outline: 0;
+      background: transparent;
+      color: var(--text);
+    }
+
+    .search kbd {
+      padding: 3px 7px;
+      border: 1px solid var(--line-strong);
+      border-radius: 6px;
+      background: rgba(255, 255, 255, 0.04);
+      color: #7e8796;
+      font-size: 10px;
+    }
+
+    .status {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--muted);
+      font-size: 11px;
+    }
+
+    .status::before {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--accent);
+      box-shadow: 0 0 10px rgba(168, 255, 120, 0.65);
+      content: "";
+    }
+
+    .hero {
+      display: grid;
+      grid-template-columns: minmax(0, 1.4fr) minmax(280px, 0.6fr);
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+
+    .hero-copy, .command-card {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--panel);
+      backdrop-filter: blur(20px);
+    }
+
+    .hero-copy { padding: 26px; }
+
+    h1 {
+      max-width: 760px;
+      margin: 8px 0 10px;
+      font-size: clamp(30px, 5vw, 58px);
+      font-weight: 720;
+      letter-spacing: -0.055em;
+      line-height: 0.98;
+    }
+
+    .gradient {
+      background: linear-gradient(110deg, var(--accent), var(--accent-2));
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+    }
+
+    .hero p {
+      max-width: 680px;
+      margin: 0;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.65;
+    }
+
+    .command-card {
+      display: grid;
+      align-content: start;
+      gap: 13px;
+      padding: 20px;
+    }
+
+    .command {
+      padding: 11px 12px;
+      border: 1px solid var(--line);
+      border-radius: 11px;
+      background: rgba(255, 255, 255, 0.025);
+    }
+
+    .command strong { display: block; margin-bottom: 3px; font-size: 12px; }
+    .command span { color: var(--muted); font-size: 10px; line-height: 1.45; }
+
+    .section-head {
+      display: flex;
+      align-items: end;
+      justify-content: space-between;
+      gap: 18px;
+      margin: 24px 0 12px;
+    }
+
+    .section-head h2 { margin: 3px 0 0; font-size: 18px; letter-spacing: -0.025em; }
+    .section-head span { color: var(--muted); font-size: 11px; }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .card {
+      overflow: hidden;
+      border: 1px solid var(--line);
+      border-radius: 15px;
+      background: var(--panel-strong);
+      transition: transform 160ms ease, border-color 160ms ease;
+    }
+
+    .card:hover { transform: translateY(-2px); border-color: var(--line-strong); }
+
+    .preview {
+      position: relative;
+      display: grid;
+      min-height: 158px;
+      place-items: center;
+      overflow: hidden;
+      border-bottom: 1px solid var(--line);
+      background: #111620;
+    }
+
+    .preview.poster {
+      background:
+        linear-gradient(125deg, transparent 30%, rgba(168, 255, 120, 0.22)),
+        radial-gradient(circle at 20% 80%, #e63f62 0 10%, transparent 11%),
+        linear-gradient(30deg, #14121f, #312041);
+    }
+
+    .preview.poster::after {
+      position: absolute;
+      right: 15px;
+      bottom: 12px;
+      width: 46%;
+      color: rgba(255, 255, 255, 0.82);
+      content: "TYPE / MOTION / NOISE";
+      font-size: 17px;
+      font-weight: 800;
+      line-height: 0.9;
+      text-align: right;
+    }
+
+    .wave {
+      display: flex;
+      height: 70px;
+      align-items: center;
+      gap: 3px;
+    }
+
+    .wave i {
+      display: block;
+      width: 3px;
+      border-radius: 99px;
+      background: linear-gradient(var(--accent), var(--accent-2));
+      opacity: 0.86;
+    }
+
+    .project-chip {
+      padding: 8px 11px;
+      border: 1px solid rgba(120, 255, 214, 0.28);
+      border-radius: 999px;
+      background: rgba(120, 255, 214, 0.07);
+      color: var(--accent-2);
+      font-size: 11px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .font-sample {
+      font-family: Georgia, serif;
+      font-size: 54px;
+      font-style: italic;
+      letter-spacing: -0.06em;
+    }
+
+    .card-body { padding: 12px 13px 14px; }
+    .card-title { overflow: hidden; font-size: 12px; font-weight: 650; text-overflow: ellipsis; white-space: nowrap; }
+    .meta { display: flex; justify-content: space-between; gap: 8px; margin-top: 6px; color: var(--muted); font-size: 10px; }
+
+    .pill-row { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 10px; }
+
+    .pill {
+      padding: 3px 7px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      color: #a7afbb;
+      font-size: 9px;
+    }
+
+    .foundation {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .foundation article {
+      padding: 17px;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: rgba(255, 255, 255, 0.025);
+    }
+
+    .foundation strong { display: block; margin-bottom: 7px; font-size: 12px; }
+    .foundation p { margin: 0; color: var(--muted); font-size: 11px; line-height: 1.55; }
+
+    @media (max-width: 1050px) {
+      .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .hero { grid-template-columns: 1fr; }
+    }
+
+    @media (max-width: 760px) {
+      .app { grid-template-columns: 1fr; }
+      .rail { position: static; height: auto; border-right: 0; border-bottom: 1px solid var(--line); }
+      .rail nav, .rail-note { display: none; }
+      main { padding: 18px; }
+      .topbar { grid-template-columns: 1fr; }
+      .grid, .foundation { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <aside class="rail">
+      <div class="brand">
+        <div class="mark">U</div>
+        <div>
+          <div>Universal Library</div>
+          <div class="eyebrow">Foundation 0.1</div>
+        </div>
+      </div>
+
+      <nav aria-label="Library navigation">
+        <div class="nav-label">Library</div>
+        <div class="nav-item active"><span class="nav-dot"></span>Everything</div>
+        <div class="nav-item"><span class="nav-dot"></span>Recent</div>
+        <div class="nav-item"><span class="nav-dot"></span>Unsorted</div>
+        <div class="nav-label">Collections</div>
+        <div class="nav-item"><span class="nav-dot"></span>Album 03</div>
+        <div class="nav-item"><span class="nav-dot"></span>Portfolio candidates</div>
+        <div class="nav-item"><span class="nav-dot"></span>Dark percussion</div>
+      </nav>
+
+      <div class="rail-note">
+        Files remain in place. This workspace will index approved folders and store only metadata, relationships, collections, and disposable previews.
+      </div>
+    </aside>
+
+    <main>
+      <header class="topbar">
+        <label class="search">
+          <span>⌕</span>
+          <input aria-label="Search preview" placeholder="Search files, samples, projects, tags, text…" disabled>
+          <kbd>⌘ K</kbd>
+        </label>
+        <div class="status">Extension foundation active</div>
+      </header>
+
+      <section class="hero">
+        <div class="hero-copy">
+          <div class="eyebrow">One interface for the whole machine</div>
+          <h1>Your filesystem, as a <span class="gradient">creative database.</span></h1>
+          <p>
+            Browse ordinary folders, graphics, samples, Ableton projects, video, fonts, documents, and mixed-media collections without importing or duplicating the source files.
+          </p>
+        </div>
+        <div class="command-card">
+          <div class="eyebrow">Available now</div>
+          <div class="command"><strong>Universal Library: Add folder</strong><span>Grant read-only access to a filesystem location.</span></div>
+          <div class="command"><strong>Add to Universal Library</strong><span>Record the current Sigma selection without moving it.</span></div>
+          <div class="command"><strong>Universal Library: Copy selected items</strong><span>Put native file paths on the clipboard for another application.</span></div>
+        </div>
+      </section>
+
+      <div class="section-head">
+        <div><div class="eyebrow">Mixed media collection</div><h2>Album 03</h2></div>
+        <span>Interface direction, not indexed data yet</span>
+      </div>
+
+      <section class="grid" aria-label="Universal Library preview cards">
+        <article class="card">
+          <div class="preview poster"></div>
+          <div class="card-body">
+            <div class="card-title">cover_direction_07.afdesign</div>
+            <div class="meta"><span>Affinity Design</span><span>84 MB</span></div>
+            <div class="pill-row"><span class="pill">cover</span><span class="pill">type</span><span class="pill">candidate</span></div>
+          </div>
+        </article>
+
+        <article class="card">
+          <div class="preview">
+            <div class="wave" aria-label="Waveform preview">
+              <i style="height:18%"></i><i style="height:40%"></i><i style="height:78%"></i><i style="height:56%"></i><i style="height:92%"></i><i style="height:44%"></i><i style="height:68%"></i><i style="height:100%"></i><i style="height:58%"></i><i style="height:28%"></i><i style="height:70%"></i><i style="height:48%"></i><i style="height:82%"></i><i style="height:36%"></i><i style="height:60%"></i><i style="height:24%"></i><i style="height:52%"></i><i style="height:88%"></i><i style="height:42%"></i><i style="height:66%"></i><i style="height:30%"></i><i style="height:72%"></i><i style="height:50%"></i><i style="height:20%"></i>
+            </div>
+          </div>
+          <div class="card-body">
+            <div class="card-title">dusty_kick_104bpm.wav</div>
+            <div class="meta"><span>104 BPM · C</span><span>0:01.2</span></div>
+            <div class="pill-row"><span class="pill">kick</span><span class="pill">one-shot</span><span class="pill">dark</span></div>
+          </div>
+        </article>
+
+        <article class="card">
+          <div class="preview"><span class="project-chip">Ableton Live Set</span></div>
+          <div class="card-body">
+            <div class="card-title">album_03_master_v18.als</div>
+            <div class="meta"><span>104 BPM · 28 tracks</span><span>3 missing</span></div>
+            <div class="pill-row"><span class="pill">master</span><span class="pill">active</span><span class="pill">music</span></div>
+          </div>
+        </article>
+
+        <article class="card">
+          <div class="preview"><span class="font-sample">Ag</span></div>
+          <div class="card-body">
+            <div class="card-title">Editorial Serif Variable.ttf</div>
+            <div class="meta"><span>Variable font</span><span>14 axes</span></div>
+            <div class="pill-row"><span class="pill">editorial</span><span class="pill">display</span><span class="pill">cover</span></div>
+          </div>
+        </article>
+      </section>
+
+      <div class="section-head">
+        <div><div class="eyebrow">Foundation contract</div><h2>Built to survive the interface</h2></div>
+      </div>
+
+      <section class="foundation">
+        <article><strong>Files stay real</strong><p>No import library, filename tags, generated sidecars, or hidden folders are added to creative projects.</p></article>
+        <article><strong>Collections are references</strong><p>The same sample, PSD, video, font, or project can appear in unlimited ordered collections without duplication.</p></article>
+        <article><strong>The catalog is independent</strong><p>Identity, metadata, previews, relationships, and agent access remain portable even if the Sigma shell changes later.</p></article>
+      </section>
+    </main>
+  </div>
+</body>
+</html>
