@@ -94,12 +94,12 @@ globalThis.sigma = {
 
 const extension = await import('../src/index.js');
 
-await test('activation registers the workspace and catalog bridge without filesystem write access', async () => {
+await test('activation registers the live workspace and catalog bridge without filesystem write access', async () => {
   await extension.activate();
 
   assert.equal(stored.get('catalog-schema-version'), 1);
   assert.equal(pages.length, 1);
-  assert.equal(pages[0].url, 'ui/index.html');
+  assert.equal(pages[0].url, 'ui/workspace.js');
   assert.deepEqual(
     [...commands.keys()].sort(),
     [
