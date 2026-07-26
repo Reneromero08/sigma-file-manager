@@ -1,0 +1,49 @@
+name: Finalize PR10
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - feat/universal-library-bundled-extension
+    paths:
+      - ".github/workflows/pr10-finalize.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  finalize:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/universal-library-bundled-extension
+      - run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path('src/composables/use-init.ts')
+          text = path.read_text()
+          old = """              if (refreshed) {
+                refreshed.localSourcePath = previousSourcePath;
+              }
+              await extensionsStorageStore.saveStorageData();
+          """
+          new = """              if (refreshed) {
+                refreshed.localSourcePath = previousSourcePath;
+              }
+
+              await extensionsStorageStore.saveStorageData();
+          """
+          if text.count(old) != 1:
+              raise SystemExit('blank-line marker missing')
+          path.write_text(text.replace(old, new, 1))
+          PY
+          rm -f .github/workflows/pr10-eslint-fix.yml
+          rm -f .github/workflows/pr10-finalize.yml
+          rm -f diagnostics/pr10-eslint.txt
+          rmdir diagnostics 2>/dev/null || true
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "fix: finalize bundled extension integration"
+          git push origin HEAD:feat/universal-library-bundled-extension
