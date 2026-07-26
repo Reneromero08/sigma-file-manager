@@ -1,3 +1,4 @@
+export const CATALOG_BINARY_ID = 'universal-library-catalog';
 export const EXECUTABLE_SETTING = 'catalog.executablePath';
 export const DATABASE_SETTING = 'catalog.databasePath';
 
@@ -15,9 +16,24 @@ function nonEmptyString(value) {
   return typeof value === 'string' && value.trim() ? value.trim() : null;
 }
 
+async function getManagedExecutablePath() {
+  if (!sigma.binary?.getPath) return null;
+  return nonEmptyString(await sigma.binary.getPath(CATALOG_BINARY_ID));
+}
+
 export async function getCatalogConfiguration() {
+  const configuredExecutablePath = nonEmptyString(await sigma.settings.get(EXECUTABLE_SETTING));
+  const managedExecutablePath = await getManagedExecutablePath();
+  const executablePath = configuredExecutablePath ?? managedExecutablePath;
   return {
-    executablePath: nonEmptyString(await sigma.settings.get(EXECUTABLE_SETTING)),
+    executablePath,
+    executableSource: configuredExecutablePath
+      ? 'custom'
+      : managedExecutablePath
+        ? 'managed'
+        : null,
+    configuredExecutablePath,
+    managedExecutablePath,
     databasePath: nonEmptyString(await sigma.settings.get(DATABASE_SETTING)),
   };
 }
@@ -32,6 +48,11 @@ export async function configureCatalogExecutable() {
   if (!selection || Array.isArray(selection)) return null;
   await sigma.settings.set(EXECUTABLE_SETTING, selection);
   return selection;
+}
+
+export async function clearCatalogExecutableOverride() {
+  await sigma.settings.reset(EXECUTABLE_SETTING);
+  return getManagedExecutablePath();
 }
 
 export async function configureCatalogDatabase() {
@@ -51,17 +72,20 @@ export async function clearCatalogDatabaseOverride() {
   await sigma.settings.reset(DATABASE_SETTING);
 }
 
-async function requireExecutable(promptForExecutable) {
+export async function resolveCatalogExecutable(options = {}) {
   const configured = nonEmptyString(await sigma.settings.get(EXECUTABLE_SETTING));
   if (configured) return configured;
 
-  if (promptForExecutable) {
+  const managed = await getManagedExecutablePath();
+  if (managed) return managed;
+
+  if (options.promptForExecutable !== false) {
     const selected = await configureCatalogExecutable();
     if (selected) return selected;
   }
 
   throw new CatalogCommandError(
-    'The Universal Library catalog executable is not configured. Run “Universal Library: Configure catalog executable” first.',
+    'The Universal Library catalog executable is unavailable. Reinstall the managed catalog or choose a custom executable.',
   );
 }
 
@@ -118,7 +142,7 @@ export function parseCatalogResult(result) {
 }
 
 export async function runCatalog(args, options = {}) {
-  const executablePath = await requireExecutable(options.promptForExecutable !== false);
+  const executablePath = await resolveCatalogExecutable(options);
   const databasePath = nonEmptyString(await sigma.settings.get(DATABASE_SETTING));
   const result = await sigma.shell.run(
     executablePath,
@@ -128,7 +152,7 @@ export async function runCatalog(args, options = {}) {
 }
 
 export async function startCatalog(args, options = {}) {
-  const executablePath = await requireExecutable(options.promptForExecutable !== false);
+  const executablePath = await resolveCatalogExecutable(options);
   const databasePath = nonEmptyString(await sigma.settings.get(DATABASE_SETTING));
   const task = await sigma.shell.runWithProgress(
     executablePath,

@@ -145,7 +145,8 @@ export async function showCatalogHealth() {
         `Roots: ${health.rootCount}`,
         `Collections: ${health.collectionCount}`,
         `Database: ${health.databasePath}`,
-        `Executable: ${configuration.executablePath}`,
+        `Executable source: ${configuration.executableSource ?? 'unavailable'}`,
+        `Executable: ${configuration.executablePath ?? 'unavailable'}`,
       ].join('\n'),
     });
   }

@@ -6,8 +6,8 @@ This extension is the Sigma interface for the independent Universal Library cata
 
 - adds a live Universal Library workspace to Sigma's sidebar;
 - requests persistent read-only access to selected folders;
-- keeps the existing non-destructive path queue and native clipboard actions;
-- connects to a user-selected `ulib` executable;
+- installs and resolves the matching `ulib` catalog binary through Sigma's managed-binary system;
+- allows a custom executable override for development or recovery;
 - optionally overrides the default SQLite catalog path;
 - reports catalog health inside Sigma;
 - registers and recursively indexes every approved folder with progress and cancellation;
@@ -24,21 +24,27 @@ The live workspace remains inside Sigma's sandbox. It calls the existing `Univer
 
 ## Setup
 
-Build the catalog executable:
+For supported Linux x64 and Windows x64 installations, Sigma downloads, checksum-verifies, extracts, and reuses the managed `ulib` binary declared by the extension.
+
+Then:
+
+1. Add one or more folders with `Universal Library: Add folder`.
+2. Run `Universal Library: Index all folders`.
+3. Open **Universal Library** in Sigma's sidebar.
+
+The catalog uses its XDG/default database location unless `Universal Library: Choose catalog database` sets an override.
+
+### Custom executable fallback
+
+`Universal Library: Choose custom catalog executable` can override the managed binary for local development or recovery.
+
+`Universal Library: Use managed catalog executable` removes that override and returns to Sigma's verified managed binary.
+
+A local development binary can be built with:
 
 ```bash
 cargo build --release --manifest-path universal-library/catalog-service/Cargo.toml
 ```
-
-Then run:
-
-1. `Universal Library: Configure catalog executable`
-2. Select `universal-library/catalog-service/target/release/ulib` on Linux or `ulib.exe` on Windows.
-3. Add one or more folders with `Universal Library: Add folder`.
-4. Run `Universal Library: Index all folders`.
-5. Open **Universal Library** in Sigma's sidebar.
-
-The catalog uses its XDG/default database location unless `Universal Library: Choose catalog database` sets an override.
 
 ## Live workspace
 
@@ -46,7 +52,7 @@ The workspace toolbar provides:
 
 - **Refresh**: reload catalog assets, tags, collections, and health;
 - **Index folders**: run the cancellable root indexer and refresh;
-- **Catalog**: select or replace the `ulib` executable;
+- **Catalog**: show current catalog status and executable source;
 - **Compact / Comfortable**: switch persistent asset-card density.
 
 The workspace itself provides:
@@ -71,10 +77,11 @@ The workspace itself provides:
 
 ### Catalog connection
 
-- `Universal Library: Configure catalog executable`
+- `Universal Library: Show catalog status`
+- `Universal Library: Use managed catalog executable`
+- `Universal Library: Choose custom catalog executable`
 - `Universal Library: Choose catalog database`
 - `Universal Library: Use default catalog database`
-- `Universal Library: Show catalog status`
 
 ### Catalog operations
 
@@ -98,10 +105,10 @@ The extension uses plain ESM JavaScript so the bridge and workspace remain inspe
 
 ## Storage boundary
 
-Extension settings store only catalog connection preferences:
+Extension settings store only optional catalog overrides:
 
-- `catalog.executablePath`
-- `catalog.databasePath`, when explicitly overridden
+- `catalog.executablePath`, only when a custom executable is selected;
+- `catalog.databasePath`, only when the database path is overridden.
 
 Extension storage contains:
 
@@ -114,7 +121,7 @@ Durable asset identities, locations, tags, collections, metadata, and audit reco
 
 ## Safety
 
-The extension still does not request `fs.write` permission. The `shell` permission is used only by the trusted host extension runtime to run the executable path explicitly selected by the user with structured `ulib` arguments.
+The extension does not request `fs.write` permission. Sigma verifies the managed archive SHA-256 before extraction. The `shell` permission is used only by the trusted host extension runtime to run the managed or explicitly selected `ulib` executable with structured arguments.
 
 The embedded workspace does not receive direct shell access. It can invoke only same-extension commands permitted by Sigma's embed bridge.
 

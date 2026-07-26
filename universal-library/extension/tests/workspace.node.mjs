@@ -157,7 +157,7 @@ test('loads ordered collection contents from the catalog provider', async () => 
   assert.ok(commandCalls.some(call => call.request.action === 'collection-items'));
 });
 
-test('uses existing command palette actions for indexing and configuration', async () => {
+test('uses existing command palette actions for indexing and catalog status', async () => {
   const sigma = createSigma();
   const { mount } = await import(`../ui/workspace.js?toolbar=${Date.now()}`);
   await mount(document.getElementById('app'), { sigma, toolbarContainer: {} });
@@ -166,5 +166,5 @@ test('uses existing command palette actions for indexing and configuration', asy
   await toolbarHandler('configure');
 
   assert.ok(commandCalls.some(call => call.commandId === 'scan-roots'));
-  assert.ok(commandCalls.some(call => call.commandId === 'configure-catalog'));
+  assert.ok(commandCalls.some(call => call.commandId === 'catalog-health'));
 });

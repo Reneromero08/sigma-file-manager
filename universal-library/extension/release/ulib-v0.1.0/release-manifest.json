@@ -1,0 +1,25 @@
+{
+  "assets": [
+    {
+      "arch": "x64",
+      "archive": "ulib-linux-x64.tar.gz",
+      "executable": "ulib",
+      "platform": "linux",
+      "schemaVersion": 1,
+      "sha256": "f4c2975a21ee82dc22bdbef925e2e1415346525c8fbdcae7465643246679140f",
+      "sizeBytes": 1729102,
+      "version": "0.1.0"
+    },
+    {
+      "arch": "x64",
+      "archive": "ulib-windows-x64.zip",
+      "executable": "ulib.exe",
+      "platform": "windows",
+      "schemaVersion": 1,
+      "sha256": "c664efae59f560767eabe867f88e0a06c8a64e05c6ad59ce10c15c37b43281b7",
+      "sizeBytes": 1426610,
+      "version": "0.1.0"
+    }
+  ],
+  "schemaVersion": 1
+}
