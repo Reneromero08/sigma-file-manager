@@ -1,0 +1,84 @@
+name: Apply Universal Library relative path fix
+
+on:
+  push:
+    branches:
+      - feat/universal-library-catalog
+    paths:
+      - ".github/workflows/universal-library-relative-path-fix.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Check out feature branch
+        uses: actions/checkout@v4
+        with:
+          ref: feat/universal-library-catalog
+
+      - name: Patch empty-parent handling and add unit coverage
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path('universal-library/catalog-service/src/lib.rs')
+          text = path.read_text()
+          text = text.replace(
+              'if let Some(parent) = path.parent() {',
+              'if let Some(parent) = non_empty_parent(&path) {',
+              1,
+          )
+          text = text.replace(
+              'if let Some(parent) = output.parent() {',
+              'if let Some(parent) = non_empty_parent(output) {',
+              1,
+          )
+          marker = '''fn now_ms() -> Result<i64> {'''
+          addition = '''fn non_empty_parent(path: &Path) -> Option<&Path> {
+              path.parent().filter(|parent| !parent.as_os_str().is_empty())
+          }
+
+          #[cfg(test)]
+          mod tests {
+              use super::non_empty_parent;
+              use std::path::Path;
+
+              #[test]
+              fn relative_catalog_paths_do_not_require_an_empty_directory() {
+                  assert_eq!(non_empty_parent(Path::new("catalog.sqlite3")), None);
+                  assert_eq!(
+                      non_empty_parent(Path::new("state/catalog.sqlite3")),
+                      Some(Path::new("state"))
+                  );
+              }
+          }
+
+          fn now_ms() -> Result<i64> {'''
+          if marker not in text:
+              raise SystemExit('now_ms marker was not found')
+          text = text.replace(marker, addition, 1)
+          path.write_text(text)
+          PY
+
+      - name: Install Rust formatter
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+
+      - name: Format and test patch
+        run: |
+          cargo fmt --manifest-path universal-library/catalog-service/Cargo.toml
+          cargo test --manifest-path universal-library/catalog-service/Cargo.toml
+
+      - name: Commit patch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add universal-library/catalog-service/src/lib.rs
+          git commit -m "fix: support relative catalog and backup paths"
+          git push origin HEAD:feat/universal-library-catalog
