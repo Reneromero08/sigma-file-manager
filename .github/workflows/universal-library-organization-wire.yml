@@ -1,0 +1,87 @@
+name: Wire Universal Library organization layer
+
+on:
+  push:
+    branches:
+      - feat/universal-library-organization
+    paths:
+      - ".github/workflows/universal-library-organization-wire.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  wire:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Check out feature branch
+        uses: actions/checkout@v4
+        with:
+          ref: feat/universal-library-organization
+
+      - name: Wire module and correct query types
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          lib = Path('universal-library/catalog-service/src/lib.rs')
+          text = lib.read_text()
+          old = '''mod indexer;
+
+          pub use indexer::{ScanIssue, ScanOptions, ScanReport};
+          '''
+          new = '''mod indexer;
+          mod organize;
+
+          pub use indexer::{ScanIssue, ScanOptions, ScanReport};
+          pub use organize::{
+              AssetMetadataRecord, AssetQuery, AssetRecord, AssetTagRecord, CollectionItemRecord,
+              RemovalRecord, TagRecord,
+          };
+          '''
+          if old not in text:
+              raise SystemExit('lib module marker was not found')
+          lib.write_text(text.replace(old, new, 1))
+
+          organize = Path('universal-library/catalog-service/src/organize.rs')
+          text = organize.read_text()
+          text = text.replace('use std::{path::Path, time::SystemTime};', 'use std::path::Path;', 1)
+          text = text.replace(
+              '#[derive(Debug, Clone, Serialize, PartialEq, Eq)]\n#[serde(rename_all = "camelCase")]\npub struct AssetMetadataRecord',
+              '#[derive(Debug, Clone, Serialize, PartialEq)]\n#[serde(rename_all = "camelCase")]\npub struct AssetMetadataRecord',
+              1,
+          )
+          text = text.replace('pub confidence: Option<String>,', 'pub confidence: Option<f64>,', 1)
+          text = text.replace("LIKE ? ESCAPE '\\\\'", "LIKE ? ESCAPE '\\'")
+          text = text.replace('CAST(confidence AS TEXT), updated_at_ms', 'confidence, updated_at_ms')
+          dummy = '''
+              #[test]
+              fn system_time_import_remains_used_for_future_metadata_expansion() {
+                  let _ = SystemTime::UNIX_EPOCH;
+              }
+          '''
+          if dummy not in text:
+              raise SystemExit('temporary SystemTime test was not found')
+          organize.write_text(text.replace(dummy, '', 1))
+          PY
+
+      - name: Install Rust checks
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Validate organization layer
+        run: |
+          cargo fmt --manifest-path universal-library/catalog-service/Cargo.toml
+          cargo clippy --manifest-path universal-library/catalog-service/Cargo.toml --all-targets -- -D warnings
+          cargo test --manifest-path universal-library/catalog-service/Cargo.toml
+
+      - name: Commit validated changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add universal-library/catalog-service
+          git commit -m "feat: wire Universal Library organization layer"
+          git push origin HEAD:feat/universal-library-organization
