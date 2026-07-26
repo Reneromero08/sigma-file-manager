@@ -104,10 +104,7 @@ export async function syncBundledExtension(
     return 'skipped-user-extension';
   }
 
-  if (
-    installed.version === preview.version
-    && installed.localSourcePath === sourcePath
-  ) {
+  if (installed.version === preview.version) {
     return 'current';
   }
 
