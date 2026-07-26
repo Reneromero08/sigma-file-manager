@@ -1,4 +1,4 @@
-name: Capture Universal Library Clippy diagnostic
+name: Apply Universal Library Clippy fix
 
 on:
   push:
@@ -11,7 +11,7 @@ permissions:
   contents: write
 
 jobs:
-  diagnose:
+  fix:
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
@@ -21,23 +21,78 @@ jobs:
         with:
           ref: feat/universal-library-catalog
 
-      - name: Install Rust toolchain
+      - name: Move tests after helper items
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path('universal-library/catalog-service/src/lib.rs')
+          text = path.read_text()
+          old = '''#[cfg(test)]
+          mod tests {
+              use super::non_empty_parent;
+              use std::path::Path;
+
+              #[test]
+              fn relative_catalog_paths_do_not_require_an_empty_directory() {
+                  assert_eq!(non_empty_parent(Path::new("catalog.sqlite3")), None);
+                  assert_eq!(
+                      non_empty_parent(Path::new("state/catalog.sqlite3")),
+                      Some(Path::new("state"))
+                  );
+              }
+          }
+
+          fn now_ms() -> Result<i64> {
+              let duration = SystemTime::now()
+                  .duration_since(UNIX_EPOCH)
+                  .context("system clock is before the Unix epoch")?;
+              i64::try_from(duration.as_millis()).context("timestamp exceeds SQLite integer range")
+          }
+          '''
+          new = '''fn now_ms() -> Result<i64> {
+              let duration = SystemTime::now()
+                  .duration_since(UNIX_EPOCH)
+                  .context("system clock is before the Unix epoch")?;
+              i64::try_from(duration.as_millis()).context("timestamp exceeds SQLite integer range")
+          }
+
+          #[cfg(test)]
+          mod tests {
+              use super::non_empty_parent;
+              use std::path::Path;
+
+              #[test]
+              fn relative_catalog_paths_do_not_require_an_empty_directory() {
+                  assert_eq!(non_empty_parent(Path::new("catalog.sqlite3")), None);
+                  assert_eq!(
+                      non_empty_parent(Path::new("state/catalog.sqlite3")),
+                      Some(Path::new("state"))
+                  );
+              }
+          }
+          '''
+          if old not in text:
+              raise SystemExit('expected test/helper block was not found')
+          path.write_text(text.replace(old, new, 1))
+          PY
+          rm universal-library/catalog-service/clippy-diagnostic.txt
+
+      - name: Install Rust checks
         uses: dtolnay/rust-toolchain@stable
         with:
-          components: clippy
+          components: rustfmt, clippy
 
-      - name: Capture diagnostic
+      - name: Validate fix
         run: |
-          set +e
-          cargo clippy --manifest-path universal-library/catalog-service/Cargo.toml --all-targets -- -D warnings > universal-library/catalog-service/clippy-diagnostic.txt 2>&1
-          status=$?
-          echo "exit_status=$status" >> universal-library/catalog-service/clippy-diagnostic.txt
-          exit 0
+          cargo fmt --manifest-path universal-library/catalog-service/Cargo.toml
+          cargo clippy --manifest-path universal-library/catalog-service/Cargo.toml --all-targets -- -D warnings
+          cargo test --manifest-path universal-library/catalog-service/Cargo.toml
 
-      - name: Commit diagnostic
+      - name: Commit fix
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add universal-library/catalog-service/clippy-diagnostic.txt
-          git commit -m "chore: capture catalog Clippy diagnostic"
+          git add universal-library/catalog-service/src/lib.rs universal-library/catalog-service/clippy-diagnostic.txt
+          git commit -m "fix: keep catalog tests after helper items"
           git push origin HEAD:feat/universal-library-catalog
