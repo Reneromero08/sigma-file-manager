@@ -19,8 +19,8 @@ export type BundledExtensionMarkerStore = {
   set(extensionId: string, value: string): void;
 };
 
-export type BundledExtensionSyncResult =
-  | 'installed'
+export type BundledExtensionSyncResult
+  = 'installed'
   | 'refreshed'
   | 'current'
   | 'cancelled'
