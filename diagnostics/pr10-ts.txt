@@ -1,4 +1,0 @@
-
-> sigma-file-manager@2.2.0 ts
-> vue-tsc --build
-

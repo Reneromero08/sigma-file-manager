@@ -9,6 +9,7 @@ import {
 const {
   appWindowInitMainWindowStateListenersMock,
   applyLaunchAtStartupPreferenceMock,
+  bootstrapBundledUniversalLibraryMock,
   archiveJobsEnsureEventListenersMock,
   backgroundMediaRefreshCustomBackgroundsMock,
   checkAndShowChangelogMock,
@@ -16,6 +17,7 @@ const {
   deleteJobsEnsureEventListenersMock,
   disableWebViewFeaturesMock,
   extensionsInitMock,
+  extensionsStorageSaveMock,
   getDirEntryMock,
   globalSearchInitOnLaunchMock,
   globalShortcutsInitMock,
@@ -42,6 +44,7 @@ const {
 } = vi.hoisted(() => ({
   appWindowInitMainWindowStateListenersMock: vi.fn(),
   applyLaunchAtStartupPreferenceMock: vi.fn(),
+  bootstrapBundledUniversalLibraryMock: vi.fn(),
   archiveJobsEnsureEventListenersMock: vi.fn(),
   backgroundMediaRefreshCustomBackgroundsMock: vi.fn(),
   checkAndShowChangelogMock: vi.fn(),
@@ -49,6 +52,7 @@ const {
   deleteJobsEnsureEventListenersMock: vi.fn(),
   disableWebViewFeaturesMock: vi.fn(),
   extensionsInitMock: vi.fn(),
+  extensionsStorageSaveMock: vi.fn(),
   getDirEntryMock: vi.fn(),
   globalSearchInitOnLaunchMock: vi.fn(),
   globalShortcutsInitMock: vi.fn(),
@@ -233,6 +237,21 @@ vi.mock('@/stores/runtime/extensions', () => ({
   }),
 }));
 
+vi.mock('@/stores/storage/extensions', () => ({
+  useExtensionsStorageStore: () => ({
+    extensionsData: { installedExtensions: {} },
+    saveStorageData: extensionsStorageSaveMock,
+  }),
+}));
+
+vi.mock('@/modules/extensions/bundled-extension-bootstrap', () => ({
+  bootstrapBundledUniversalLibrary: bootstrapBundledUniversalLibraryMock,
+}));
+
+vi.mock('@/modules/extensions/bundled-extension-sync', () => ({
+  BUNDLED_UNIVERSAL_LIBRARY_ID: 'reneromero08.universal-library',
+}));
+
 vi.mock('@/stores/runtime/archive-jobs', () => ({
   useArchiveJobsStore: () => ({
     ensureEventListeners: archiveJobsEnsureEventListenersMock,
@@ -316,6 +335,7 @@ describe('useInit startup restoration', () => {
     vi.useFakeTimers();
     appWindowInitMainWindowStateListenersMock.mockReset();
     applyLaunchAtStartupPreferenceMock.mockReset().mockResolvedValue(undefined);
+    bootstrapBundledUniversalLibraryMock.mockReset().mockResolvedValue('current');
     archiveJobsEnsureEventListenersMock.mockReset().mockResolvedValue(undefined);
     backgroundMediaRefreshCustomBackgroundsMock.mockReset().mockResolvedValue(undefined);
     checkAndShowChangelogMock.mockReset().mockResolvedValue(undefined);
@@ -323,6 +343,7 @@ describe('useInit startup restoration', () => {
     deleteJobsEnsureEventListenersMock.mockReset().mockResolvedValue(undefined);
     disableWebViewFeaturesMock.mockReset();
     extensionsInitMock.mockReset().mockResolvedValue(undefined);
+    extensionsStorageSaveMock.mockReset().mockResolvedValue(undefined);
     getDirEntryMock.mockReset().mockResolvedValue(null);
     globalSearchInitOnLaunchMock.mockReset().mockResolvedValue(undefined);
     globalShortcutsInitMock.mockReset().mockResolvedValue(undefined);

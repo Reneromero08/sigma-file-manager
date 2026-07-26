@@ -21,11 +21,11 @@ export type BundledExtensionMarkerStore = {
 
 export type BundledExtensionSyncResult
   = 'installed'
-  | 'refreshed'
-  | 'current'
-  | 'cancelled'
-  | 'skipped-user-extension'
-  | 'skipped-user-uninstalled';
+    | 'refreshed'
+    | 'current'
+    | 'cancelled'
+    | 'skipped-user-extension'
+    | 'skipped-user-uninstalled';
 
 export type BundledExtensionSyncOptions = {
   extensionId: string;
