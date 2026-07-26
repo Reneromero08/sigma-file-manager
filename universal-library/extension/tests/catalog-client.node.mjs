@@ -2,6 +2,8 @@ import assert from 'node:assert/strict';
 import test, { beforeEach } from 'node:test';
 
 const settings = new Map();
+let managedExecutablePath = null;
+let requestedBinaryId = null;
 let openFileSelection = null;
 let saveFileSelection = null;
 let lastRun = null;
@@ -22,6 +24,12 @@ globalThis.sigma = {
     },
     async reset(key) {
       settings.delete(key);
+    },
+  },
+  binary: {
+    async getPath(id) {
+      requestedBinaryId = id;
+      return managedExecutablePath;
     },
   },
   dialog: {
@@ -53,6 +61,8 @@ const client = await import('../src/catalog-client.js');
 
 beforeEach(() => {
   settings.clear();
+  managedExecutablePath = null;
+  requestedBinaryId = null;
   openFileSelection = null;
   saveFileSelection = null;
   lastRun = null;
@@ -64,7 +74,8 @@ beforeEach(() => {
   };
 });
 
-test('configures executable and database paths persistently', async () => {
+test('reports custom, managed, and database configuration explicitly', async () => {
+  managedExecutablePath = '/managed/ulib';
   openFileSelection = '/home/raul/bin/ulib';
   saveFileSelection = '/home/raul/.local/share/universal-library/catalog.sqlite3';
 
@@ -72,15 +83,40 @@ test('configures executable and database paths persistently', async () => {
   assert.equal(await client.configureCatalogDatabase(), saveFileSelection);
   assert.deepEqual(await client.getCatalogConfiguration(), {
     executablePath: openFileSelection,
+    executableSource: 'custom',
+    configuredExecutablePath: openFileSelection,
+    managedExecutablePath,
     databasePath: saveFileSelection,
   });
+  assert.equal(requestedBinaryId, client.CATALOG_BINARY_ID);
 
   await client.clearCatalogDatabaseOverride();
   assert.equal((await client.getCatalogConfiguration()).databasePath, null);
 });
 
-test('runs the configured executable with a database override and parses JSON', async () => {
-  settings.set(client.EXECUTABLE_SETTING, '/opt/ulib');
+test('uses the Sigma-managed binary automatically when no custom override exists', async () => {
+  managedExecutablePath = '/managed/bin/ulib';
+
+  const data = await client.runCatalog(['health']);
+
+  assert.deepEqual(data, { status: 'ok' });
+  assert.deepEqual(lastRun, {
+    commandPath: managedExecutablePath,
+    args: ['health'],
+  });
+  assert.equal(openFileSelection, null);
+  assert.deepEqual(await client.getCatalogConfiguration(), {
+    executablePath: managedExecutablePath,
+    executableSource: 'managed',
+    configuredExecutablePath: null,
+    managedExecutablePath,
+    databasePath: null,
+  });
+});
+
+test('custom executable override wins over the managed binary', async () => {
+  managedExecutablePath = '/managed/bin/ulib';
+  settings.set(client.EXECUTABLE_SETTING, '/custom/ulib');
   settings.set(client.DATABASE_SETTING, '/state/catalog.sqlite3');
   runResult = {
     code: 0,
@@ -91,12 +127,21 @@ test('runs the configured executable with a database override and parses JSON', 
   const data = await client.runCatalog(['health']);
   assert.deepEqual(data, { rootCount: 3 });
   assert.deepEqual(lastRun, {
-    commandPath: '/opt/ulib',
+    commandPath: '/custom/ulib',
     args: ['--database', '/state/catalog.sqlite3', 'health'],
   });
 });
 
-test('prompts for an executable when a command is first used', async () => {
+test('clearing the custom override returns to the managed binary', async () => {
+  managedExecutablePath = '/managed/bin/ulib';
+  settings.set(client.EXECUTABLE_SETTING, '/custom/ulib');
+
+  assert.equal(await client.clearCatalogExecutableOverride(), managedExecutablePath);
+  assert.equal(settings.has(client.EXECUTABLE_SETTING), false);
+  assert.equal(await client.resolveCatalogExecutable({ promptForExecutable: false }), managedExecutablePath);
+});
+
+test('prompts for a custom executable only when no managed binary exists', async () => {
   openFileSelection = '/usr/local/bin/ulib';
 
   await client.runCatalog(['health']);
@@ -105,8 +150,15 @@ test('prompts for an executable when a command is first used', async () => {
   assert.equal(lastRun.commandPath, openFileSelection);
 });
 
+test('fails clearly when neither managed nor custom executable is available', async () => {
+  await assert.rejects(
+    client.resolveCatalogExecutable({ promptForExecutable: false }),
+    /managed catalog or choose a custom executable/,
+  );
+});
+
 test('returns cancellable progress tasks and parses their final envelope', async () => {
-  settings.set(client.EXECUTABLE_SETTING, '/opt/ulib');
+  managedExecutablePath = '/managed/bin/ulib';
   const progressLines = [];
   runResult = {
     code: 0,
@@ -122,7 +174,10 @@ test('returns cancellable progress tasks and parses their final envelope', async
   assert.equal(task.taskId, 'task-1');
   assert.deepEqual(await task.result, { filesSeen: 42 });
   assert.deepEqual(progressLines, ['working']);
-  assert.deepEqual(lastProgressRun.args, ['root', 'scan', '/library']);
+  assert.deepEqual(lastProgressRun, {
+    commandPath: managedExecutablePath,
+    args: ['root', 'scan', '/library'],
+  });
 });
 
 test('surfaces structured catalog errors', () => {
