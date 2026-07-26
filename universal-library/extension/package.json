@@ -2,7 +2,7 @@
   "$schema": "../../packages/api/manifest.schema.json",
   "id": "reneromero08.universal-library",
   "name": "Universal Library",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "publisher": {
     "name": "Reneromero08",
     "url": "https://github.com/Reneromero08"
@@ -32,7 +32,8 @@
     "fs.read",
     "notifications",
     "dialogs",
-    "clipboard"
+    "clipboard",
+    "shell"
   ],
   "activationEvents": [
     "onStartup"
@@ -41,8 +42,8 @@
     "sigmaFileManager": ">=2.2.0"
   },
   "scripts": {
-    "check": "node --check src/index.js",
-    "test": "node --test tests/bootstrap.node.mjs"
+    "check": "node --check src/index.js && node --check src/catalog-client.js && node --check src/catalog-bridge.js",
+    "test": "node --test tests/*.node.mjs"
   },
   "type": "module",
   "private": true
