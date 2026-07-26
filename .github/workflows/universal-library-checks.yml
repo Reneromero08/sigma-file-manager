@@ -34,6 +34,8 @@ jobs:
           node --check universal-library/extension/src/index.js
           node --check universal-library/extension/src/catalog-client.js
           node --check universal-library/extension/src/catalog-bridge.js
+          node --check universal-library/extension/src/workspace-provider.js
+          node --check universal-library/extension/ui/workspace.js
 
       - name: Run extension tests
         run: node --test universal-library/extension/tests/*.node.mjs
