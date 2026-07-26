@@ -8,6 +8,11 @@ import {
   tagSelectedEntries,
   useDefaultCatalogDatabase,
 } from './catalog-bridge.js';
+import {
+  clearCatalogExecutableOverride,
+  formatCatalogError,
+  runCatalog,
+} from './catalog-client.js';
 import { handleWorkspaceRequest } from './workspace-provider.js';
 
 const ROOTS_KEY = 'library-roots';
@@ -160,6 +165,42 @@ async function copySelectedEntries() {
   });
 }
 
+async function useManagedCatalogExecutable() {
+  try {
+    const managedPath = await clearCatalogExecutableOverride();
+    if (!managedPath) {
+      sigma.ui.showNotification({
+        title: t('catalog.managedUnavailableTitle', 'Managed catalog is unavailable'),
+        description: t(
+          'catalog.managedUnavailableDescription',
+          'Reinstall or update the Universal Library extension, or choose a custom catalog executable.',
+        ),
+        type: 'warning',
+      });
+      return;
+    }
+
+    const health = await runCatalog(['health'], { promptForExecutable: false });
+    sigma.ui.showNotification({
+      title: t('catalog.managedEnabledTitle', 'Using the managed Universal Library catalog'),
+      description: t(
+        'catalog.managedEnabledDescription',
+        'Schema {version} is ready at {path}.',
+        { version: health.schemaVersion, path: health.databasePath },
+      ),
+      type: 'success',
+    });
+  }
+  catch (error) {
+    sigma.ui.showNotification({
+      title: t('catalog.managedFailedTitle', 'Could not use the managed catalog'),
+      description: formatCatalogError(error),
+      type: 'error',
+      duration: 8000,
+    });
+  }
+}
+
 async function browseAssetsCommand(options) {
   if (options?.workspace === true) {
     return handleWorkspaceRequest(options);
@@ -221,8 +262,13 @@ export async function activate() {
   );
   registerCommand(
     'configure-catalog',
-    t('commands.configureCatalog', 'Universal Library: Configure catalog executable'),
+    t('commands.configureCatalog', 'Universal Library: Choose custom catalog executable'),
     configureCatalog,
+  );
+  registerCommand(
+    'use-managed-catalog',
+    t('commands.useManagedCatalog', 'Universal Library: Use managed catalog executable'),
+    useManagedCatalogExecutable,
   );
   registerCommand(
     'configure-database',
