@@ -1,0 +1,33 @@
+name: Capture PR10 ESLint diagnostics
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - feat/universal-library-bundled-extension
+    paths:
+      - ".github/workflows/pr10-eslint-diagnostic.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/universal-library-bundled-extension
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.16.0
+          cache: npm
+      - run: npm ci
+      - run: mkdir -p diagnostics && npm run lint:eslint:check > diagnostics/pr10-eslint.txt 2>&1 || true
+      - run: |
+          rm .github/workflows/pr10-eslint-diagnostic.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .github/workflows/pr10-eslint-diagnostic.yml diagnostics/pr10-eslint.txt
+          git commit -m "test: capture PR10 eslint report"
+          git push origin HEAD:feat/universal-library-bundled-extension
