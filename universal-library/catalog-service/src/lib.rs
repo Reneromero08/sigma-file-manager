@@ -10,8 +10,13 @@ use serde::Serialize;
 use uuid::Uuid;
 
 mod indexer;
+mod organize;
 
 pub use indexer::{ScanIssue, ScanOptions, ScanReport};
+pub use organize::{
+    AssetMetadataRecord, AssetQuery, AssetRecord, AssetTagRecord, CollectionItemRecord,
+    RemovalRecord, TagRecord,
+};
 
 const CURRENT_SCHEMA_VERSION: i64 = 1;
 const INITIAL_MIGRATION: &str = include_str!("../../catalog/0001_initial.sql");

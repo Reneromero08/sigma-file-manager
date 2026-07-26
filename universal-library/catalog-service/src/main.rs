@@ -211,18 +211,14 @@ fn run() -> Result<()> {
                 include_offline,
                 limit,
             })?),
-            AssetCommand::Tags { reference } => {
-                print_success(catalog.list_asset_tags(&reference)?)
-            }
+            AssetCommand::Tags { reference } => print_success(catalog.list_asset_tags(&reference)?),
         },
         Command::Tag { command } => match command {
             TagCommand::Create { name, color } => {
                 print_success(catalog.create_tag(&name, color.as_deref())?)
             }
             TagCommand::List => print_success(catalog.list_tags()?),
-            TagCommand::Add { asset, tag } => {
-                print_success(catalog.assign_tag(&asset, &tag)?)
-            }
+            TagCommand::Add { asset, tag } => print_success(catalog.assign_tag(&asset, &tag)?),
             TagCommand::Remove { asset, tag } => {
                 print_success(catalog.remove_tag_from_asset(&asset, &tag)?)
             }
@@ -259,16 +255,10 @@ fn run() -> Result<()> {
                 key,
                 value,
                 source,
-            } => print_success(catalog.set_asset_metadata(
-                &asset,
-                &namespace,
-                &key,
-                &value,
-                &source,
-            )?),
-            MetadataCommand::List { asset } => {
-                print_success(catalog.list_asset_metadata(&asset)?)
-            }
+            } => print_success(
+                catalog.set_asset_metadata(&asset, &namespace, &key, &value, &source)?,
+            ),
+            MetadataCommand::List { asset } => print_success(catalog.list_asset_metadata(&asset)?),
         },
         Command::Backup { output } => {
             let output = catalog.backup(output)?;

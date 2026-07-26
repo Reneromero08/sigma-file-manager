@@ -1,4 +1,4 @@
-use std::{path::Path, time::SystemTime};
+use std::path::Path;
 
 use anyhow::{Context, Result, bail};
 use rusqlite::{
@@ -79,7 +79,7 @@ pub struct CollectionItemRecord {
     pub primary_path: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct AssetMetadataRecord {
     pub asset_id: String,
@@ -87,7 +87,7 @@ pub struct AssetMetadataRecord {
     pub key: String,
     pub value_json: String,
     pub source: String,
-    pub confidence: Option<String>,
+    pub confidence: Option<f64>,
     pub updated_at_ms: i64,
 }
 
@@ -133,11 +133,21 @@ impl Catalog {
                 )",
             );
         }
-        if let Some(kind) = query.media_kind.as_deref().map(str::trim).filter(|v| !v.is_empty()) {
+        if let Some(kind) = query
+            .media_kind
+            .as_deref()
+            .map(str::trim)
+            .filter(|v| !v.is_empty())
+        {
             sql.push_str(" AND a.media_kind = ?");
             values.push(Value::Text(kind.to_ascii_lowercase()));
         }
-        if let Some(text) = query.text.as_deref().map(str::trim).filter(|v| !v.is_empty()) {
+        if let Some(text) = query
+            .text
+            .as_deref()
+            .map(str::trim)
+            .filter(|v| !v.is_empty())
+        {
             let pattern = format!("%{}%", escape_like(text));
             sql.push_str(
                 " AND (
@@ -176,8 +186,7 @@ impl Catalog {
                 params![color, now, existing.id],
             )?;
             existing.id
-        }
-        else {
+        } else {
             let id = Uuid::new_v4().to_string();
             transaction.execute(
                 "INSERT INTO tags (id, name, color, created_at_ms, updated_at_ms)
@@ -212,7 +221,11 @@ impl Catalog {
             .context("failed to list tags")
     }
 
-    pub fn assign_tag(&mut self, asset_reference: &str, tag_reference: &str) -> Result<AssetTagRecord> {
+    pub fn assign_tag(
+        &mut self,
+        asset_reference: &str,
+        tag_reference: &str,
+    ) -> Result<AssetTagRecord> {
         let now = now_ms()?;
         let transaction = self.connection.transaction()?;
         let asset_id = resolve_asset_id(&transaction, asset_reference)?;
@@ -438,7 +451,7 @@ impl Catalog {
         let asset_id = resolve_asset_id(&self.connection, asset_reference)?;
         let mut statement = self.connection.prepare(
             "SELECT asset_id, namespace, key, value_json, source,
-                    CAST(confidence AS TEXT), updated_at_ms
+                    confidence, updated_at_ms
              FROM asset_metadata
              WHERE asset_id = ?1
              ORDER BY namespace COLLATE NOCASE, key COLLATE NOCASE",
@@ -451,7 +464,9 @@ impl Catalog {
 
 fn resolve_asset_id(connection: &Connection, reference: &str) -> Result<String> {
     if let Some(id) = connection
-        .query_row("SELECT id FROM assets WHERE id = ?1", [reference], |row| row.get(0))
+        .query_row("SELECT id FROM assets WHERE id = ?1", [reference], |row| {
+            row.get(0)
+        })
         .optional()?
     {
         return Ok(id);
@@ -582,7 +597,7 @@ fn find_asset_metadata(
     connection
         .query_row(
             "SELECT asset_id, namespace, key, value_json, source,
-                    CAST(confidence AS TEXT), updated_at_ms
+                    confidence, updated_at_ms
              FROM asset_metadata
              WHERE asset_id = ?1 AND namespace = ?2 AND key = ?3",
             params![asset_id, namespace, key],
@@ -629,7 +644,10 @@ fn trimmed_optional(value: Option<&str>) -> Option<&str> {
 }
 
 fn escape_like(value: &str) -> String {
-    value.replace('\\', "\\\\").replace('%', "\\%").replace('_', "\\_")
+    value
+        .replace('\\', "\\\\")
+        .replace('%', "\\%")
+        .replace('_', "\\_")
 }
 
 fn asset_from_row(row: &Row<'_>) -> rusqlite::Result<AssetRecord> {
@@ -701,10 +719,5 @@ mod tests {
     #[test]
     fn escapes_literal_like_wildcards() {
         assert_eq!(escape_like(r"50%_done\\"), r"50\%\_done\\\\");
-    }
-
-    #[test]
-    fn system_time_import_remains_used_for_future_metadata_expansion() {
-        let _ = SystemTime::UNIX_EPOCH;
     }
 }

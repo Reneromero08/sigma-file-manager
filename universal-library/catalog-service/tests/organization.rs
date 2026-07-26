@@ -100,10 +100,12 @@ fn tags_are_idempotent_and_assignable_by_asset_path() {
         .remove_tag_from_asset(sample.to_string_lossy().as_ref(), "dark")
         .expect("remove tag");
     assert!(removal.removed);
-    assert!(catalog
-        .list_asset_tags(sample.to_string_lossy().as_ref())
-        .expect("list empty tags")
-        .is_empty());
+    assert!(
+        catalog
+            .list_asset_tags(sample.to_string_lossy().as_ref())
+            .expect("list empty tags")
+            .is_empty()
+    );
 }
 
 #[test]
@@ -226,15 +228,17 @@ fn custom_metadata_is_validated_normalized_and_audited() {
         .expect("list metadata");
     assert_eq!(metadata.len(), 1);
     assert_eq!(metadata[0].value_json, r#"{"bpm":105}"#);
-    assert!(catalog
-        .set_asset_metadata(
-            sample.to_string_lossy().as_ref(),
-            "audio",
-            "broken",
-            "not-json",
-            "test-agent",
-        )
-        .is_err());
+    assert!(
+        catalog
+            .set_asset_metadata(
+                sample.to_string_lossy().as_ref(),
+                "audio",
+                "broken",
+                "not-json",
+                "test-agent",
+            )
+            .is_err()
+    );
 
     let connection = Connection::open(&database).expect("open database for assertions");
     let audit_count: i64 = connection
