@@ -77,6 +77,12 @@
       "app",
       "dmg"
     ],
+    "resources": {
+      "../universal-library/extension/package.json": "bundled-extensions/reneromero08.universal-library/package.json",
+      "../universal-library/extension/src/": "bundled-extensions/reneromero08.universal-library/src/",
+      "../universal-library/extension/ui/": "bundled-extensions/reneromero08.universal-library/ui/",
+      "../universal-library/extension/locales/": "bundled-extensions/reneromero08.universal-library/locales/"
+    },
     "windows": {
       "nsis": {
         "installMode": "currentUser",
