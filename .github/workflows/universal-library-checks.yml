@@ -1,0 +1,107 @@
+name: Universal Library checks
+
+on:
+  pull_request:
+    paths:
+      - "universal-library/**"
+      - ".github/workflows/universal-library-checks.yml"
+  push:
+    branches:
+      - product
+    paths:
+      - "universal-library/**"
+      - ".github/workflows/universal-library-checks.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.16.0
+
+      - name: Check extension JavaScript syntax
+        run: node --check universal-library/extension/src/index.js
+
+      - name: Validate extension manifest contract
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+
+          const path = 'universal-library/extension/package.json';
+          const manifest = JSON.parse(fs.readFileSync(path, 'utf8'));
+          const required = ['id', 'name', 'version', 'repository', 'license', 'extensionType', 'permissions', 'engines'];
+          const missing = required.filter(key => manifest[key] === undefined);
+
+          if (missing.length > 0) {
+            throw new Error(`Missing manifest fields: ${missing.join(', ')}`);
+          }
+          if (manifest.extensionType !== 'api') {
+            throw new Error('Universal Library bootstrap must remain an API extension.');
+          }
+          if (!manifest.permissions.includes('fs.read')) {
+            throw new Error('Read permission is required for user-approved roots.');
+          }
+          if (manifest.permissions.includes('fs.write')) {
+            throw new Error('Foundation extension must not request filesystem write permission.');
+          }
+          if (manifest.main !== 'src/index.js') {
+            throw new Error('Unexpected extension entry point.');
+          }
+          NODE
+
+      - name: Apply catalog migration to an empty database
+        run: |
+          python3 <<'PY'
+          import pathlib
+          import sqlite3
+
+          migration = pathlib.Path('universal-library/catalog/0001_initial.sql').read_text()
+          connection = sqlite3.connect(':memory:')
+          connection.executescript(migration)
+
+          expected_tables = {
+              'schema_migrations',
+              'roots',
+              'assets',
+              'locations',
+              'tags',
+              'asset_tags',
+              'collections',
+              'collection_items',
+              'asset_metadata',
+              'asset_relations',
+              'previews',
+              'saved_queries',
+              'analysis_jobs',
+              'audit_log',
+          }
+          actual_tables = {
+              row[0]
+              for row in connection.execute(
+                  "SELECT name FROM sqlite_master WHERE type = 'table'"
+              )
+          }
+          missing = expected_tables - actual_tables
+          if missing:
+              raise SystemExit(f'Migration did not create tables: {sorted(missing)}')
+
+          version = connection.execute('PRAGMA user_version').fetchone()[0]
+          if version != 1:
+              raise SystemExit(f'Expected user_version 1, got {version}')
+
+          migration_row = connection.execute(
+              'SELECT version FROM schema_migrations'
+          ).fetchone()
+          if migration_row != (1,):
+              raise SystemExit(f'Unexpected migration record: {migration_row}')
+          PY
