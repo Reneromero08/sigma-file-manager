@@ -9,9 +9,11 @@ use rusqlite::{Connection, OptionalExtension, Row, backup::Backup, params};
 use serde::Serialize;
 use uuid::Uuid;
 
+mod audio;
 mod indexer;
 mod organize;
 
+pub use audio::{AudioAnalysisIssue, AudioAnalysisRecord, AudioBatchAnalysisReport};
 pub use indexer::{ScanIssue, ScanOptions, ScanReport};
 pub use organize::{
     AssetMetadataRecord, AssetQuery, AssetRecord, AssetTagRecord, CollectionItemRecord,

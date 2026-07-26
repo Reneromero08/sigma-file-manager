@@ -33,6 +33,11 @@ enum Command {
         #[command(subcommand)]
         command: AssetCommand,
     },
+    /// Decode audio facts and bounded waveform previews.
+    Audio {
+        #[command(subcommand)]
+        command: AudioCommand,
+    },
     /// Manage reusable asset tags.
     Tag {
         #[command(subcommand)]
@@ -93,6 +98,30 @@ enum AssetCommand {
     },
     /// List tags assigned to an asset ID or indexed path.
     Tags { reference: String },
+}
+
+#[derive(Debug, Subcommand)]
+enum AudioCommand {
+    /// Decode and persist technical facts plus a bounded waveform for one indexed audio asset.
+    Analyze {
+        asset: String,
+        #[arg(long, default_value_t = 256)]
+        points: usize,
+    },
+    /// Return a stored audio analysis for an indexed asset.
+    Get { asset: String },
+    /// List stored audio analyses for the workspace.
+    List {
+        #[arg(long, default_value_t = 1000)]
+        limit: u32,
+    },
+    /// Analyze online audio assets that do not yet have a stored analysis.
+    AnalyzeMissing {
+        #[arg(long, default_value_t = 500)]
+        limit: u32,
+        #[arg(long, default_value_t = 256)]
+        points: usize,
+    },
 }
 
 #[derive(Debug, Subcommand)]
@@ -212,6 +241,16 @@ fn run() -> Result<()> {
                 limit,
             })?),
             AssetCommand::Tags { reference } => print_success(catalog.list_asset_tags(&reference)?),
+        },
+        Command::Audio { command } => match command {
+            AudioCommand::Analyze { asset, points } => {
+                print_success(catalog.analyze_audio(&asset, points)?)
+            }
+            AudioCommand::Get { asset } => print_success(catalog.get_audio_analysis(&asset)?),
+            AudioCommand::List { limit } => print_success(catalog.list_audio_analyses(limit)?),
+            AudioCommand::AnalyzeMissing { limit, points } => {
+                print_success(catalog.analyze_missing_audio(limit, points)?)
+            }
         },
         Command::Tag { command } => match command {
             TagCommand::Create { name, color } => {
