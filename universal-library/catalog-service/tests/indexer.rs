@@ -64,8 +64,7 @@ fn explicit_options_include_hidden_and_default_ignored_entries() {
     let database = directory.path().join("State").join("catalog.sqlite3");
     fs::create_dir_all(root.join("build")).expect("create build directory");
     fs::write(root.join(".reference.png"), b"hidden").expect("write hidden file");
-    fs::write(root.join("build").join("render.mov"), b"build output")
-        .expect("write build file");
+    fs::write(root.join("build").join("render.mov"), b"build output").expect("write build file");
 
     let mut catalog = Catalog::open(&database).expect("open catalog");
     let registered = catalog.add_root(&root, None).expect("add root");

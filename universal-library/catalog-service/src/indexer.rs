@@ -85,11 +85,7 @@ struct ScanCounters {
 }
 
 impl Catalog {
-    pub fn scan_root(
-        &mut self,
-        root_reference: &str,
-        options: ScanOptions,
-    ) -> Result<ScanReport> {
+    pub fn scan_root(&mut self, root_reference: &str, options: ScanOptions) -> Result<ScanReport> {
         let root = resolve_root(&self.connection, root_reference)?;
         let started_at_ms = next_scan_timestamp(&self.connection, &root.id)?;
         let root_path = PathBuf::from(&root.path);
@@ -98,10 +94,7 @@ impl Catalog {
         if !root_path.is_dir() {
             let completed_at_ms = now_ms()?;
             let transaction = self.connection.transaction()?;
-            transaction.execute(
-                "UPDATE roots SET is_online = 0 WHERE id = ?1",
-                [&root.id],
-            )?;
+            transaction.execute("UPDATE roots SET is_online = 0 WHERE id = ?1", [&root.id])?;
             counters.locations_marked_offline = u64::try_from(transaction.execute(
                 "UPDATE locations
                  SET is_online = 0,
@@ -111,13 +104,7 @@ impl Catalog {
             )?)?;
             transaction.commit()?;
             counters.push_issue(&root.path, "library root is unavailable");
-            return Ok(counters.into_report(
-                &root,
-                false,
-                started_at_ms,
-                completed_at_ms,
-                false,
-            ));
+            return Ok(counters.into_report(&root, false, started_at_ms, completed_at_ms, false));
         }
 
         let catalog_artifacts = catalog_artifact_paths(self.path());
@@ -230,13 +217,7 @@ impl Catalog {
         transaction.commit()?;
 
         let completed_at_ms = now_ms()?;
-        Ok(counters.into_report(
-            &root,
-            true,
-            started_at_ms,
-            completed_at_ms,
-            complete,
-        ))
+        Ok(counters.into_report(&root, true, started_at_ms, completed_at_ms, complete))
     }
 
     fn apply_scan_batch(
@@ -303,13 +284,7 @@ fn upsert_snapshot(
     counters: &mut ScanCounters,
 ) -> Result<()> {
     if let Some(location) = find_location_by_path(transaction, &snapshot.path)? {
-        update_asset_and_location(
-            transaction,
-            &location,
-            root,
-            snapshot,
-            scan_timestamp,
-        )?;
+        update_asset_and_location(transaction, &location, root, snapshot, scan_timestamp)?;
         counters.assets_updated += 1;
         return Ok(());
     }
@@ -320,13 +295,7 @@ fn upsert_snapshot(
         snapshot.device_id.as_deref(),
         snapshot.inode.as_deref(),
     )? {
-        update_asset_and_location(
-            transaction,
-            &location,
-            root,
-            snapshot,
-            scan_timestamp,
-        )?;
+        update_asset_and_location(transaction, &location, root, snapshot, scan_timestamp)?;
         counters.assets_updated += 1;
         counters.locations_moved += 1;
         return Ok(());
@@ -620,22 +589,21 @@ fn is_default_ignored_name(name: &str) -> bool {
 
 fn classify_media_kind(extension: Option<&str>) -> &'static str {
     match extension.unwrap_or_default() {
-        "wav" | "wave" | "aif" | "aiff" | "flac" | "mp3" | "ogg" | "opus" | "m4a"
-        | "aac" => "audio",
-        "jpg" | "jpeg" | "png" | "gif" | "webp" | "tif" | "tiff" | "bmp" | "svg"
-        | "avif" | "heic" | "heif" | "dng" | "cr2" | "nef" | "arw" => "image",
-        "mp4" | "mov" | "mkv" | "webm" | "avi" | "m4v" | "mxf" => "video",
-        "psd" | "psb" | "ai" | "eps" | "afdesign" | "afphoto" | "afpub" | "kra"
-        | "clip" | "xd" | "sketch" => "design",
-        "als" | "flp" | "logicx" | "blend" | "blend1" | "aep" | "prproj" | "drp" => {
-            "project"
+        "wav" | "wave" | "aif" | "aiff" | "flac" | "mp3" | "ogg" | "opus" | "m4a" | "aac" => {
+            "audio"
         }
+        "jpg" | "jpeg" | "png" | "gif" | "webp" | "tif" | "tiff" | "bmp" | "svg" | "avif"
+        | "heic" | "heif" | "dng" | "cr2" | "nef" | "arw" => "image",
+        "mp4" | "mov" | "mkv" | "webm" | "avi" | "m4v" | "mxf" => "video",
+        "psd" | "psb" | "ai" | "eps" | "afdesign" | "afphoto" | "afpub" | "kra" | "clip" | "xd"
+        | "sketch" => "design",
+        "als" | "flp" | "logicx" | "blend" | "blend1" | "aep" | "prproj" | "drp" => "project",
         "pdf" | "doc" | "docx" | "odt" | "rtf" | "txt" | "md" | "epub" => "document",
         "ttf" | "otf" | "woff" | "woff2" => "font",
         "zip" | "7z" | "rar" | "tar" | "gz" | "bz2" | "xz" => "archive",
-        "rs" | "js" | "jsx" | "ts" | "tsx" | "vue" | "py" | "go" | "c" | "h" | "cpp"
-        | "hpp" | "java" | "kt" | "swift" | "html" | "css" | "scss" | "json" | "yaml"
-        | "yml" | "toml" | "xml" | "sql" | "sh" => "code",
+        "rs" | "js" | "jsx" | "ts" | "tsx" | "vue" | "py" | "go" | "c" | "h" | "cpp" | "hpp"
+        | "java" | "kt" | "swift" | "html" | "css" | "scss" | "json" | "yaml" | "yml" | "toml"
+        | "xml" | "sql" | "sh" => "code",
         _ => "unknown",
     }
 }
