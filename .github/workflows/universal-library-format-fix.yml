@@ -1,0 +1,44 @@
+name: Format Universal Library catalog service
+
+on:
+  push:
+    branches:
+      - feat/universal-library-catalog-service
+    paths:
+      - "universal-library/catalog-service/**"
+      - ".github/workflows/universal-library-format-fix.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  format:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Check out feature branch
+        uses: actions/checkout@v4
+        with:
+          ref: feat/universal-library-catalog-service
+
+      - name: Install Rust formatter
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+
+      - name: Format catalog service
+        run: cargo fmt --manifest-path universal-library/catalog-service/Cargo.toml
+
+      - name: Commit formatter output
+        run: |
+          if git diff --quiet -- universal-library/catalog-service; then
+            echo "Catalog service is already formatted."
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add universal-library/catalog-service
+          git commit -m "style: format universal library catalog service"
+          git push origin HEAD:feat/universal-library-catalog-service
