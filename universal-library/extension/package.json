@@ -41,7 +41,8 @@
     "sigmaFileManager": ">=2.2.0"
   },
   "scripts": {
-    "check": "node --check src/index.js"
+    "check": "node --check src/index.js",
+    "test": "node --test tests/*.test.mjs"
   },
   "type": "module",
   "private": true
