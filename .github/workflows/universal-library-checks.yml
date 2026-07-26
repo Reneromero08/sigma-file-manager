@@ -32,6 +32,9 @@ jobs:
       - name: Check extension JavaScript syntax
         run: node --check universal-library/extension/src/index.js
 
+      - name: Run extension bootstrap tests
+        run: node --test universal-library/extension/tests/*.test.mjs
+
       - name: Validate extension manifest contract
         run: |
           node --input-type=module <<'NODE'
