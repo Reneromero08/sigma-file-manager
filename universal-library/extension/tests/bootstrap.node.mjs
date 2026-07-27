@@ -66,6 +66,18 @@ globalThis.sigma = {
     async clipboardWriteFiles(paths, operation) {
       clipboardWrites.push({ paths, operation });
     },
+    async showModal() {
+      return null;
+    },
+    alert(options) {
+      return { type: 'alert', ...options };
+    },
+    checkbox(options) {
+      return { type: 'checkbox', ...options };
+    },
+    select(options) {
+      return { type: 'select', ...options };
+    },
   },
   context: {
     getSelectedEntries() {
@@ -106,11 +118,14 @@ await test('activation registers the live workspace and managed catalog bridge w
       'add-root',
       'add-selected',
       'add-selected-to-collection',
+      'auto-refresh-status',
       'browse-assets',
       'catalog-health',
+      'configure-auto-refresh',
       'configure-catalog',
       'configure-database',
       'copy-selected',
+      'run-auto-refresh-now',
       'scan-roots',
       'show-roots',
       'tag-selected',
