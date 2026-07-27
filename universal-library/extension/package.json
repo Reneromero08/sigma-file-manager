@@ -53,7 +53,7 @@
       "name": "Universal Library Catalog",
       "version": "0.2.0",
       "executable": "ulib",
-      "repository": "https://github.com/Reneromero08",
+      "repository": "https://github.com/Reneromero08/sigma-file-manager",
       "platforms": [
         "linux",
         "windows"
