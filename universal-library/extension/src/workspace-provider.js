@@ -104,8 +104,8 @@ async function analyzeMissingAudio(request) {
   ]);
 }
 
-async function getAudioUrl(request) {
-  const path = requiredString(request.path, 'Audio path');
+async function getAssetUrl(request, label = 'Asset path') {
+  const path = requiredString(request.path, label);
   const url = await sigma.fs.scoped.toAssetUrl(path);
   return { path, url };
 }
@@ -126,8 +126,10 @@ export async function handleWorkspaceRequest(request = {}) {
       return analyzeAudio(request);
     case 'analyze-missing-audio':
       return analyzeMissingAudio(request);
+    case 'asset-url':
+      return getAssetUrl(request);
     case 'audio-url':
-      return getAudioUrl(request);
+      return getAssetUrl(request, 'Audio path');
     default:
       throw new Error(`Unknown Universal Library workspace action: ${request.action ?? 'missing'}`);
   }
