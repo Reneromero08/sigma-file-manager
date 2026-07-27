@@ -29,7 +29,7 @@ const checksums = new Map(
 
 await test('extension declares the exact published managed catalog assets', () => {
   assert.equal(releaseManifest.schemaVersion, 1);
-  assert.equal(manifest.version, '0.7.0');
+  assert.equal(manifest.version, '0.8.0');
   assert.equal(manifest.permissions.includes('shell'), true);
   assert.equal(manifest.permissions.includes('fs.write'), false);
   assert.equal(manifest.binaries.length, 1);

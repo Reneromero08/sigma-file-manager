@@ -6,6 +6,10 @@ import {
   formatSampleRate,
 } from './audio-ui.js';
 import { createAuditionController } from './audio-player.js';
+import {
+  createImagePreviewLoader,
+  isPreviewableImage,
+} from './image-preview.js';
 
 const MEDIA_FILTERS = [
   ['all', 'All'],
@@ -286,6 +290,10 @@ function installStyles(container) {
     }
     .ul-grid.is-compact .ul-asset-preview { height: 82px; }
     .ul-kind-glyph { color: hsl(267 90% 80%); font-size: 29px; font-weight: 750; text-shadow: 0 8px 22px hsl(267 80% 55% / 0.4); }
+    .ul-image-preview { position: absolute; width: 100%; height: 100%; object-fit: cover; opacity: 0; inset: 0; transition: opacity 140ms ease; }
+    .ul-image-preview.is-loaded { opacity: 1; }
+    .ul-inspector-image { width: 100%; height: 100%; object-fit: contain; opacity: 0; border-radius: inherit; transition: opacity 140ms ease; }
+    .ul-inspector-image.is-loaded { opacity: 1; }
     .ul-waveform { width: calc(100% - 18px); height: 62px; overflow: visible; }
     .ul-waveform path { fill: hsl(267 88% 72% / 0.78); filter: drop-shadow(0 5px 12px hsl(267 80% 45% / 0.35)); }
     .ul-inspector-waveform { width: calc(100% - 28px); height: 92px; overflow: visible; }
@@ -500,6 +508,31 @@ export async function mount(container, context) {
     return sigma.commands.executeCommand('browse-assets', { workspace: true, ...request });
   }
 
+  const imagePreviews = createImagePreviewLoader({
+    concurrency: 4,
+    resolveUrl: asset => execute({ action: 'asset-url', path: asset.primaryPath }),
+  });
+
+  function attachImagePreview(containerNode, asset, className) {
+    if (!isPreviewableImage(asset)) return null;
+    const image = element('img', className);
+    image.alt = '';
+    image.decoding = 'async';
+    image.loading = 'lazy';
+    imagePreviews.request(asset)
+      .then((url) => {
+        if (!url || !image.isConnected) return;
+        image.addEventListener('load', () => image.classList.add('is-loaded'), { once: true });
+        image.addEventListener('error', () => image.remove(), { once: true });
+        image.src = url;
+      })
+      .catch(() => {
+        image.remove();
+      });
+    containerNode.append(image);
+    return image;
+  }
+
   const audition = createAuditionController({
     resolveUrl: asset => execute({ action: 'audio-url', path: asset.primaryPath }),
     createAudio: audioFactory,
@@ -620,6 +653,7 @@ export async function mount(container, context) {
       inspectorWaveform
       ?? element('div', 'ul-kind-glyph', KIND_GLYPHS[asset.mediaKind] ?? '·'),
     );
+    attachImagePreview(hero, asset, 'ul-inspector-image');
     const name = element('h2', '', asset.canonicalName);
     const path = element('div', 'ul-inspector-path', asset.primaryPath ?? 'No current file location');
     const actions = element('div', 'ul-inspector-actions');
@@ -759,6 +793,7 @@ export async function mount(container, context) {
       preview.append(
         waveform ?? element('div', 'ul-kind-glyph', KIND_GLYPHS[asset.mediaKind] ?? '·'),
       );
+      attachImagePreview(preview, asset, 'ul-image-preview');
       if (asset.mediaKind === 'audio' && asset.primaryPath) {
         preview.append(element('span', 'ul-play-indicator', isPlaying ? '❚❚' : '▶'));
       }
@@ -1115,6 +1150,7 @@ export async function mount(container, context) {
   return {
     dispose() {
       audition.dispose();
+      imagePreviews.dispose();
     },
   };
 }
