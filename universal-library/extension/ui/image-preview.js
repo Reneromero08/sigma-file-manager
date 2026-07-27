@@ -19,9 +19,9 @@ function extensionFromPath(path) {
 export function isPreviewableImage(asset) {
   return Boolean(
     asset?.mediaKind === 'image'
-      && asset?.isOnline
-      && asset?.primaryPath
-      && PREVIEWABLE_EXTENSIONS.has(extensionFromPath(asset.primaryPath)),
+    && asset?.isOnline
+    && asset?.primaryPath
+    && PREVIEWABLE_EXTENSIONS.has(extensionFromPath(asset.primaryPath)),
   );
 }
 
