@@ -14,6 +14,12 @@ import {
   runCatalog,
 } from './catalog-client.js';
 import { handleWorkspaceRequest } from './workspace-provider.js';
+import {
+  configureAutoRefresh,
+  createAutoRefreshController,
+  runAutoRefreshNow,
+  showAutoRefreshStatus,
+} from './auto-refresh.js';
 
 const ROOTS_KEY = 'library-roots';
 const SEED_ENTRIES_KEY = 'seed-entries';
@@ -21,6 +27,7 @@ const CATALOG_VERSION_KEY = 'catalog-schema-version';
 
 /** @type {{ dispose(): void }[]} */
 const disposables = [];
+let autoRefreshController = null;
 
 function t(key, fallback, params) {
   return sigma.i18n.extensionT(key, params, fallback);
@@ -226,6 +233,8 @@ export async function activate() {
   }
 
   await sigma.storage.set(CATALOG_VERSION_KEY, 1);
+  autoRefreshController = createAutoRefreshController();
+  await autoRefreshController.initialize();
 
   disposables.push(
     sigma.sidebar.registerPage({
@@ -291,6 +300,21 @@ export async function activate() {
     scanLibraryRoots,
   );
   registerCommand(
+    'configure-auto-refresh',
+    t('commands.configureAutoRefresh', 'Universal Library: Configure automatic refresh'),
+    () => configureAutoRefresh(autoRefreshController),
+  );
+  registerCommand(
+    'run-auto-refresh-now',
+    t('commands.runAutoRefreshNow', 'Universal Library: Run automatic refresh now'),
+    () => runAutoRefreshNow(autoRefreshController),
+  );
+  registerCommand(
+    'auto-refresh-status',
+    t('commands.autoRefreshStatus', 'Universal Library: Show automatic refresh status'),
+    () => showAutoRefreshStatus(autoRefreshController),
+  );
+  registerCommand(
     'browse-assets',
     t('commands.browseAssets', 'Universal Library: Browse indexed assets'),
     browseAssetsCommand,
@@ -344,6 +368,8 @@ export async function activate() {
 }
 
 export function deactivate() {
+  autoRefreshController?.dispose();
+  autoRefreshController = null;
   while (disposables.length) {
     disposables.pop()?.dispose();
   }
