@@ -30,7 +30,21 @@ jobs:
       - run: python3 scripts/fix-auto-refresh-race.py
       - run: npx eslint --fix universal-library/extension/src/auto-refresh.js universal-library/extension/tests/auto-refresh.node.mjs
       - run: npm --prefix universal-library/extension run check
-      - run: npm --prefix universal-library/extension test
+      - name: Run extension tests
+        run: |
+          set +e
+          npm --prefix universal-library/extension test > auto-refresh-test-output.txt 2>&1
+          status=$?
+          cat auto-refresh-test-output.txt
+          if [ "$status" -ne 0 ]; then
+            git config user.name 'github-actions[bot]'
+            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+            git add universal-library/extension auto-refresh-test-output.txt
+            git commit -m 'Capture automatic refresh test failure'
+            git push origin HEAD:feat/universal-library-auto-refresh
+            exit "$status"
+          fi
+          rm auto-refresh-test-output.txt
       - run: npx eslint universal-library/extension/src/auto-refresh.js universal-library/extension/tests/auto-refresh.node.mjs universal-library/extension/src/index.js universal-library/extension/tests/bootstrap.node.mjs
       - run: git rm scripts/fix-auto-refresh-race.py .github/workflows/universal-library-auto-refresh-race-fix.yml
       - name: Commit verified race fix
