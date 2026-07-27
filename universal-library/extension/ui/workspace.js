@@ -5,6 +5,7 @@ import {
   formatDuration,
   formatSampleRate,
 } from './audio-ui.js';
+import { createAuditionController } from './audio-player.js';
 
 const MEDIA_FILTERS = [
   ['all', 'All'],
@@ -272,6 +273,8 @@ function installStyles(container) {
     }
     .ul-asset-card:hover { border-color: hsl(267 72% 65% / 0.48); transform: translateY(-1px); }
     .ul-asset-card.is-selected { border-color: var(--ul-accent); box-shadow: 0 0 0 2px var(--ul-accent-soft); }
+    .ul-asset-card.is-playing { border-color: hsl(158 70% 55% / 0.78); box-shadow: 0 0 0 1px hsl(158 70% 55% / 0.24), 0 18px 38px hsl(158 70% 20% / 0.22); }
+    .ul-asset-card.is-audio { cursor: pointer; }
     .ul-asset-preview {
       position: relative;
       display: grid;
@@ -291,6 +294,8 @@ function installStyles(container) {
     .ul-audio-fact { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .ul-audio-fact + .ul-audio-fact::before { margin-right: 5px; color: var(--ul-border); content: '·'; }
     .ul-offline-badge { position: absolute; top: 8px; right: 8px; padding: 3px 6px; border-radius: 999px; color: hsl(3 90% 80%); background: hsl(3 65% 25% / 0.75); font-size: 8px; text-transform: uppercase; }
+    .ul-play-indicator { position: absolute; left: 9px; bottom: 8px; display: grid; width: 25px; height: 25px; place-items: center; border: 1px solid hsl(0 0% 100% / 0.18); border-radius: 50%; color: white; background: hsl(220 24% 7% / 0.78); box-shadow: 0 5px 18px hsl(220 35% 2% / 0.45); font-size: 10px; }
+    .ul-asset-card.is-playing .ul-play-indicator { color: hsl(158 82% 72%); border-color: hsl(158 70% 55% / 0.45); }
     .ul-asset-body { padding: 10px 11px 11px; }
     .ul-asset-name { overflow: hidden; font-size: 11px; font-weight: 650; text-overflow: ellipsis; white-space: nowrap; }
     .ul-asset-meta { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 5px; color: var(--ul-muted); font-size: 9px; }
@@ -334,6 +339,10 @@ function installStyles(container) {
     .ul-button:hover { border-color: hsl(267 72% 65% / 0.55); }
     .ul-button.is-primary { border-color: hsl(267 72% 65% / 0.55); background: hsl(267 62% 48%); }
     .ul-button:disabled { opacity: 0.45; cursor: not-allowed; }
+    .ul-player { display: grid; margin-top: 12px; gap: 8px; }
+    .ul-player-row { display: flex; align-items: center; justify-content: space-between; color: var(--ul-muted); font-size: 9px; }
+    .ul-slider { width: 100%; accent-color: var(--ul-accent); cursor: pointer; }
+    .ul-player-error { color: hsl(2 80% 72%); font-size: 9px; line-height: 1.4; }
     .ul-detail-list { display: grid; margin-top: 18px; gap: 1px; }
     .ul-detail-row { display: grid; padding: 9px 0; border-bottom: 1px solid var(--ul-border); grid-template-columns: 84px minmax(0, 1fr); gap: 8px; font-size: 10px; }
     .ul-detail-label { color: var(--ul-muted); }
@@ -433,7 +442,7 @@ function buildShell(container) {
 }
 
 export async function mount(container, context) {
-  const { sigma, toolbarContainer } = context;
+  const { sigma, toolbarContainer, audioFactory } = context;
   container.replaceChildren();
   installStyles(container);
   const shell = buildShell(container);
@@ -451,6 +460,14 @@ export async function mount(container, context) {
     error: null,
     compact: await sigma.storage.get('workspace.compact') === true,
     modalMode: null,
+    playback: {
+      assetId: null,
+      status: 'idle',
+      currentTime: 0,
+      duration: 0,
+      volume: 1,
+      error: null,
+    },
   };
 
   const refs = {
@@ -481,6 +498,37 @@ export async function mount(container, context) {
 
   async function execute(request) {
     return sigma.commands.executeCommand('browse-assets', { workspace: true, ...request });
+  }
+
+  const audition = createAuditionController({
+    resolveUrl: asset => execute({ action: 'audio-url', path: asset.primaryPath }),
+    createAudio: audioFactory,
+    onChange(playback) {
+      state.playback = playback;
+      if (state.snapshot) {
+        renderAssets();
+        renderInspector();
+      }
+    },
+  });
+
+  async function toggleAudition(asset = selectedAsset()) {
+    if (!asset || asset.mediaKind !== 'audio' || !asset.primaryPath) return;
+    try {
+      await audition.toggle(asset);
+    }
+    catch (error) {
+      sigma.ui.showNotification({
+        title: 'Audio preview failed',
+        description: error instanceof Error ? error.message : String(error),
+        type: 'error',
+      });
+    }
+  }
+
+  function isTypingTarget(target) {
+    return target instanceof Element
+      && (target.matches('input, select, textarea') || target.closest('[contenteditable="true"]'));
   }
 
   function currentAssets() {
@@ -575,8 +623,14 @@ export async function mount(container, context) {
     const name = element('h2', '', asset.canonicalName);
     const path = element('div', 'ul-inspector-path', asset.primaryPath ?? 'No current file location');
     const actions = element('div', 'ul-inspector-actions');
+    const isActiveAudio = state.playback.assetId === asset.id;
+    const isPlaying = isActiveAudio && state.playback.status === 'playing';
 
-    const copy = element('button', 'ul-button is-primary', 'Copy file');
+    const play = element('button', 'ul-button is-primary', isPlaying ? 'Pause audio' : 'Play audio');
+    play.type = 'button';
+    play.dataset.action = 'toggle-audio';
+    play.disabled = asset.mediaKind !== 'audio' || !asset.primaryPath;
+    const copy = element('button', 'ul-button', 'Copy file');
     copy.type = 'button';
     copy.dataset.action = 'copy-asset';
     copy.disabled = !asset.primaryPath;
@@ -596,7 +650,37 @@ export async function mount(container, context) {
     analyze.type = 'button';
     analyze.dataset.action = 'analyze-audio';
     analyze.disabled = asset.mediaKind !== 'audio' || !asset.primaryPath;
-    actions.append(copy, tag, collection, analyze);
+    actions.append(play, copy, tag, collection, analyze);
+
+    const player = element('div', 'ul-player');
+    if (asset.mediaKind === 'audio') {
+      const progress = element('input', 'ul-slider');
+      progress.type = 'range';
+      progress.min = '0';
+      progress.max = '1000';
+      progress.value = isActiveAudio && state.playback.duration > 0
+        ? String(Math.round((state.playback.currentTime / state.playback.duration) * 1000))
+        : '0';
+      progress.dataset.action = 'seek-audio';
+      progress.disabled = !isActiveAudio || state.playback.duration <= 0;
+      progress.setAttribute('aria-label', 'Audio preview position');
+      const timeline = element('div', 'ul-player-row');
+      timeline.append(
+        element('span', '', formatDuration((isActiveAudio ? state.playback.currentTime : 0) * 1000)),
+        element('span', '', formatDuration((isActiveAudio ? state.playback.duration : asset.audioAnalysis?.durationMs / 1000) * 1000)),
+      );
+      const volume = element('input', 'ul-slider');
+      volume.type = 'range';
+      volume.min = '0';
+      volume.max = '100';
+      volume.value = String(Math.round(state.playback.volume * 100));
+      volume.dataset.action = 'volume-audio';
+      volume.setAttribute('aria-label', 'Audio preview volume');
+      player.append(progress, timeline, volume);
+      if (isActiveAudio && state.playback.error) {
+        player.append(element('div', 'ul-player-error', state.playback.error));
+      }
+    }
 
     const details = element('div', 'ul-detail-list');
     const rows = [
@@ -622,7 +706,7 @@ export async function mount(container, context) {
       row.append(element('div', 'ul-detail-label', label), element('div', 'ul-detail-value', String(value)));
       details.append(row);
     }
-    refs.inspector.append(hero, name, path, actions, details);
+    refs.inspector.append(hero, name, path, actions, player, details);
   }
 
   function renderAssets() {
@@ -663,7 +747,11 @@ export async function mount(container, context) {
 
     const grid = element('div', `ul-grid${state.compact ? ' is-compact' : ''}`);
     for (const asset of assets) {
-      const card = element('button', `ul-asset-card${state.selectedAssetId === asset.id ? ' is-selected' : ''}`);
+      const isPlaying = state.playback.assetId === asset.id && state.playback.status === 'playing';
+      const card = element(
+        'button',
+        `ul-asset-card${state.selectedAssetId === asset.id ? ' is-selected' : ''}${asset.mediaKind === 'audio' ? ' is-audio' : ''}${isPlaying ? ' is-playing' : ''}`,
+      );
       card.type = 'button';
       card.dataset.assetId = asset.id;
       const preview = element('div', 'ul-asset-preview');
@@ -671,6 +759,9 @@ export async function mount(container, context) {
       preview.append(
         waveform ?? element('div', 'ul-kind-glyph', KIND_GLYPHS[asset.mediaKind] ?? '·'),
       );
+      if (asset.mediaKind === 'audio' && asset.primaryPath) {
+        preview.append(element('span', 'ul-play-indicator', isPlaying ? '❚❚' : '▶'));
+      }
       if (!asset.isOnline) preview.append(element('span', 'ul-offline-badge', 'offline'));
       const body = element('div', 'ul-asset-body');
       body.append(
@@ -894,17 +985,24 @@ export async function mount(container, context) {
     if (!button) return;
     await loadCollection(button.dataset.collection);
   });
-  refs.content.addEventListener('click', (event) => {
+  refs.content.addEventListener('click', async (event) => {
     const card = event.target.closest('[data-asset-id]');
     if (!card) return;
     state.selectedAssetId = card.dataset.assetId;
+    const asset = selectedAsset();
     renderAssets();
     renderInspector();
+    if (asset?.mediaKind === 'audio' && asset.primaryPath) {
+      await toggleAudition(asset);
+    }
   });
   refs.inspector.addEventListener('click', async (event) => {
     const action = event.target.closest('[data-action]')?.dataset.action;
     const asset = selectedAsset();
-    if (action === 'copy-asset' && asset?.primaryPath) {
+    if (action === 'toggle-audio') {
+      await toggleAudition(asset);
+    }
+    else if (action === 'copy-asset' && asset?.primaryPath) {
       await sigma.ui.clipboardWriteFiles([asset.primaryPath], 'copy');
       sigma.ui.showNotification({ title: 'Copied for another application', description: asset.canonicalName, type: 'success' });
     }
@@ -933,13 +1031,30 @@ export async function mount(container, context) {
       }
     }
   });
+  refs.inspector.addEventListener('input', (event) => {
+    const action = event.target.dataset.action;
+    if (action === 'seek-audio') {
+      audition.seekRatio(Number(event.target.value) / 1000);
+    }
+    if (action === 'volume-audio') {
+      audition.setVolume(Number(event.target.value) / 100);
+    }
+  });
   shell.querySelector('[data-action="new-collection"]').addEventListener('click', () => openModal('new-collection'));
   shell.querySelector('[data-action="modal-cancel"]').addEventListener('click', closeModal);
   shell.querySelector('[data-action="modal-save"]').addEventListener('click', saveModal);
   refs.modalBackdrop.addEventListener('click', (event) => {
     if (event.target === refs.modalBackdrop) closeModal();
   });
-  document.addEventListener('keydown', (event) => {
+  document.addEventListener('keydown', async (event) => {
+    if (event.code === 'Space' && !state.modalMode && !isTypingTarget(event.target)) {
+      const asset = selectedAsset();
+      if (asset?.mediaKind === 'audio' && asset.primaryPath) {
+        event.preventDefault();
+        await toggleAudition(asset);
+        return;
+      }
+    }
     if (event.key === '/' && document.activeElement !== refs.search) {
       event.preventDefault();
       refs.search.focus();
@@ -997,4 +1112,9 @@ export async function mount(container, context) {
   );
 
   await loadSnapshot();
+  return {
+    dispose() {
+      audition.dispose();
+    },
+  };
 }
