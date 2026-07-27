@@ -1,0 +1,44 @@
+name: Universal Library auto-refresh race fix
+
+on:
+  pull_request:
+    branches:
+      - product
+    paths:
+      - 'scripts/fix-auto-refresh-race.py'
+      - 'universal-library/extension/**'
+      - '.github/workflows/universal-library-auto-refresh-race-fix.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  fix-and-validate:
+    if: github.head_ref == 'feat/universal-library-auto-refresh' || github.ref_name == 'feat/universal-library-auto-refresh'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/universal-library-auto-refresh
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: python3 scripts/fix-auto-refresh-race.py
+      - run: npx eslint --fix universal-library/extension/src/auto-refresh.js universal-library/extension/tests/auto-refresh.node.mjs
+      - run: npm --prefix universal-library/extension run check
+      - run: npm --prefix universal-library/extension test
+      - run: npx eslint universal-library/extension/src/auto-refresh.js universal-library/extension/tests/auto-refresh.node.mjs universal-library/extension/src/index.js universal-library/extension/tests/bootstrap.node.mjs
+      - run: git rm scripts/fix-auto-refresh-race.py .github/workflows/universal-library-auto-refresh-race-fix.yml
+      - name: Commit verified race fix
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add universal-library/extension
+          git commit -m 'Guard automatic refresh against immediate overlap'
+          git push origin HEAD:feat/universal-library-auto-refresh
