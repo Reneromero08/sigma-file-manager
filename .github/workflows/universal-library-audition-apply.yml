@@ -1,0 +1,54 @@
+name: Universal Library audition apply
+
+on:
+  pull_request:
+    branches:
+      - product
+    paths:
+      - 'scripts/apply-audio-audition-workspace.py'
+      - 'universal-library/extension/**'
+      - '.github/workflows/universal-library-audition-apply.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  apply-and-validate:
+    if: github.head_ref == 'feat/universal-library-audio-audition-v2' || github.ref_name == 'feat/universal-library-audio-audition-v2'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/universal-library-audio-audition-v2
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Apply workspace patch
+        run: python3 scripts/apply-audio-audition-workspace.py
+      - name: Format changed JavaScript
+        run: npx eslint --fix universal-library/extension/ui/workspace.js universal-library/extension/ui/audio-player.js universal-library/extension/src/workspace-provider.js universal-library/extension/tests/audio-player.node.mjs universal-library/extension/tests/workspace-audio-url.node.mjs
+      - name: Validate extension syntax
+        run: npm --prefix universal-library/extension run check
+      - name: Run extension tests
+        run: npm --prefix universal-library/extension test
+      - name: Validate scoped lint
+        run: npx eslint universal-library/extension/ui/workspace.js universal-library/extension/ui/audio-player.js universal-library/extension/src/workspace-provider.js universal-library/extension/tests/audio-player.node.mjs universal-library/extension/tests/workspace-audio-url.node.mjs universal-library/extension/tests/workspace.node.mjs
+      - name: Remove one-shot files
+        run: git rm scripts/apply-audio-audition-workspace.py .github/workflows/universal-library-audition-apply.yml
+      - name: Commit validated workspace
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add universal-library/extension
+          if git diff --cached --quiet; then
+            echo 'No workspace changes to commit.'
+            exit 1
+          fi
+          git commit -m 'Integrate secure audio audition workspace'
+          git push origin HEAD:feat/universal-library-audio-audition-v2
