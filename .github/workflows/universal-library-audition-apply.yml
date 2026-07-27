@@ -28,7 +28,20 @@ jobs:
           cache: npm
       - run: npm ci
       - name: Apply workspace patch
-        run: python3 scripts/apply-audio-audition-workspace.py
+        run: |
+          set +e
+          python3 scripts/apply-audio-audition-workspace.py > audition-patch-output.txt 2>&1
+          status=$?
+          cat audition-patch-output.txt
+          if [ "$status" -ne 0 ]; then
+            git config user.name 'github-actions[bot]'
+            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+            git add audition-patch-output.txt
+            git commit -m 'Capture audition workspace patch failure'
+            git push origin HEAD:feat/universal-library-audio-audition-v2
+            exit "$status"
+          fi
+          rm audition-patch-output.txt
       - name: Format changed JavaScript
         run: npx eslint --fix universal-library/extension/ui/workspace.js universal-library/extension/ui/audio-player.js universal-library/extension/src/workspace-provider.js universal-library/extension/tests/audio-player.node.mjs universal-library/extension/tests/workspace-audio-url.node.mjs
       - name: Validate extension syntax
