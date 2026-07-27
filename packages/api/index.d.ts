@@ -698,6 +698,11 @@ export interface SigmaExtensionAPI {
       writeFile(path: string, data: Uint8Array): Promise<void>;
       readDir(path: string): Promise<ExtensionDirEntry[]>;
       exists(path: string): Promise<boolean>;
+      /**
+       * Returns a streamable Tauri asset URL after verifying persistent scoped read access.
+       * The URL does not grant access to paths outside the extension's approved directories.
+       */
+      toAssetUrl(path: string): Promise<string>;
     };
   };
   ui: {

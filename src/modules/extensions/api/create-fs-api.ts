@@ -2,6 +2,7 @@
 // License: GNU GPLv3 or later. See the license file in the project root for more information.
 // Copyright © 2021 - present Aleksey Hoffman. All rights reserved.
 
+import { convertFileSrc } from '@tauri-apps/api/core';
 import { open } from '@tauri-apps/plugin-dialog';
 import type {
   ExtensionDirEntry,
@@ -283,6 +284,10 @@ export function createFsAPI(context: ExtensionContext) {
       exists: async (path: string): Promise<boolean> => {
         await requireScopedReadAccess(path);
         return invokeAsExtension<boolean>(context.extensionId, 'path_exists', { path });
+      },
+      toAssetUrl: async (path: string): Promise<string> => {
+        await requireScopedReadAccess(path);
+        return convertFileSrc(path);
       },
     },
   };
