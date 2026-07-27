@@ -43,25 +43,27 @@ jobs:
           )
           path.write_text(text, encoding='utf-8')
           PY
-          set +e
-          python3 scripts/apply-audio-audition-workspace.py > audition-patch-output.txt 2>&1
-          status=$?
-          cat audition-patch-output.txt
-          if [ "$status" -ne 0 ]; then
-            git config user.name 'github-actions[bot]'
-            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-            git add audition-patch-output.txt
-            git commit -m 'Capture audition workspace patch failure'
-            git push origin HEAD:feat/universal-library-audio-audition-v2
-            exit "$status"
-          fi
-          rm audition-patch-output.txt
+          python3 scripts/apply-audio-audition-workspace.py
       - name: Format changed JavaScript
         run: npx eslint --fix universal-library/extension/ui/workspace.js universal-library/extension/ui/audio-player.js universal-library/extension/src/workspace-provider.js universal-library/extension/tests/audio-player.node.mjs universal-library/extension/tests/workspace-audio-url.node.mjs
       - name: Validate extension syntax
         run: npm --prefix universal-library/extension run check
       - name: Run extension tests
-        run: npm --prefix universal-library/extension test
+        run: |
+          set +e
+          npm --prefix universal-library/extension test > audition-test-output.txt 2>&1
+          status=$?
+          cat audition-test-output.txt
+          if [ "$status" -ne 0 ]; then
+            git config user.name 'github-actions[bot]'
+            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+            git rm -f --ignore-unmatch scripts/apply-audio-audition-workspace.py .github/workflows/universal-library-audition-apply.yml audition-patch-output.txt
+            git add universal-library/extension audition-test-output.txt
+            git commit -m 'Capture generated audition workspace test failure'
+            git push origin HEAD:feat/universal-library-audio-audition-v2
+            exit "$status"
+          fi
+          rm audition-test-output.txt
       - name: Validate scoped lint
         run: npx eslint universal-library/extension/ui/workspace.js universal-library/extension/ui/audio-player.js universal-library/extension/src/workspace-provider.js universal-library/extension/tests/audio-player.node.mjs universal-library/extension/tests/workspace-audio-url.node.mjs universal-library/extension/tests/workspace.node.mjs
       - name: Remove one-shot files
