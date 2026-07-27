@@ -141,7 +141,6 @@ test('suppresses overlapping refreshes and preserves one scan', async () => {
   });
 
   const first = controller.runNow('manual');
-  await new Promise(resolve => setTimeout(resolve, 0));
   const second = await controller.runNow('manual');
   assert.deepEqual(second, { skipped: true, reason: 'already-running' });
   assert.equal(scans, 1);

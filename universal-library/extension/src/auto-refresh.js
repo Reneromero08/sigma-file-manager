@@ -146,9 +146,9 @@ export function createAutoRefreshController(options = {}) {
       lastStartedAt: startedAt,
       lastError: null,
     };
-    await persistStatus();
 
-    running = (async () => {
+    const execution = (async () => {
+      await persistStatus();
       try {
         const summary = await scan();
         status = {
@@ -178,7 +178,8 @@ export function createAutoRefreshController(options = {}) {
       }
     })();
 
-    return running;
+    running = execution;
+    return execution;
   }
 
   async function configure(value) {
