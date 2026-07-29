@@ -9,6 +9,8 @@ import { getCurrentWindow } from '@tauri-apps/api/window';
 import type { UnlistenFn } from '@tauri-apps/api/event';
 import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow';
 import { useClipboardStore } from '@/stores/runtime/clipboard';
+import { ensurePlatformInfo } from '@/utils/platform-info';
+import { shouldUseNativeClipboardWatcher } from '@/modules/extensions/utils/clipboard-watcher-policy';
 
 const CLIPBOARD_SYNC_DEBOUNCE_MS = 50;
 
@@ -50,6 +52,12 @@ export function useClipboardFocusSync() {
 
   async function setupClipboardChangeSync() {
     try {
+      const platform = await ensurePlatformInfo();
+
+      if (!shouldUseNativeClipboardWatcher(platform.isLinux)) {
+        return;
+      }
+
       await invoke('ensure_system_clipboard_watcher');
       clipboardChangedUnlisten = await listen<string>('system-clipboard-changed', () => {
         scheduleClipboardSync();
