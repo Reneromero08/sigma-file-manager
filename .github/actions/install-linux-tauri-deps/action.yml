@@ -20,4 +20,7 @@ runs:
           gir1.2-webkit2-4.1=2.44.0-2 \
           libayatana-appindicator3-dev \
           librsvg2-dev \
+          gstreamer1.0-plugins-base \
+          gstreamer1.0-plugins-good \
+          gstreamer1.0-libav \
           patchelf
