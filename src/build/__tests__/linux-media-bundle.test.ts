@@ -40,6 +40,7 @@ describe('Linux media packaging', () => {
     expect(config.bundle?.linux?.deb?.depends).toEqual(expect.arrayContaining([
       'gstreamer1.0-plugins-base',
       'gstreamer1.0-plugins-good',
+      'gstreamer1.0-plugins-bad',
       'gstreamer1.0-libav',
     ]));
     expect(config.app?.security?.assetProtocol?.scope?.allow).toContain('/**');
