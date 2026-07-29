@@ -7,6 +7,13 @@ import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 type LinuxBundleConfig = {
+  app?: {
+    security?: {
+      assetProtocol?: {
+        scope?: string[];
+      };
+    };
+  };
   bundle?: {
     linux?: {
       appimage?: {
@@ -32,5 +39,6 @@ describe('Linux media packaging', () => {
       'gstreamer1.0-plugins-good',
       'gstreamer1.0-libav',
     ]));
+    expect(config.app?.security?.assetProtocol?.scope).toContain('/**');
   });
 });

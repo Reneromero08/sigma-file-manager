@@ -1025,7 +1025,7 @@ export const useExtensionsStore = defineStore('extensions', () => {
         await completeNewExtensionInstall(extensionId, manifest, manifest.version, {
           isLocal: true,
           localSourcePath: sourcePath,
-          installPendingDependencies: true,
+          installPendingDependencies: !options.deferBinarySetup,
         }, {
           deferBinarySetup: options.deferBinarySetup,
         });

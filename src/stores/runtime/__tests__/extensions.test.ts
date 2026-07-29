@@ -384,11 +384,20 @@ describe('extensions runtime store', () => {
     getPlatformBinaryDefinitionsMock.mockResolvedValue(manifest.binaries);
     const extensionsStore = useExtensionsStore();
     const storageStore = useExtensionsStorageStore();
+    const addInstalledExtensionSpy = vi.spyOn(storageStore, 'addInstalledExtension');
 
     await extensionsStore.installLocalExtension('/bundled/universal-library', {
       deferBinarySetup: true,
     });
 
+    expect(addInstalledExtensionSpy).toHaveBeenCalledWith(
+      manifest.id,
+      manifest.version,
+      manifest,
+      expect.objectContaining({
+        installPendingDependencies: false,
+      }),
+    );
     expect(promptBinarySetupMock).not.toHaveBeenCalled();
     expect(syncManifestBinariesMock).not.toHaveBeenCalled();
     expect(loadExtensionRuntimeMock).toHaveBeenCalledWith(
