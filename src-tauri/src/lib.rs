@@ -40,6 +40,7 @@ use serde::Serialize;
 use tauri::{Emitter, Manager};
 
 const SIGMA_AUTOSTART_CLI_FLAG: &str = "--sigma-autostart";
+const CUSTOM_SINGLE_INSTANCE_DBUS_ID: &str = "com.reneromero08.sigmafilemanager.custom";
 const AUXILIARY_WINDOW_RELEASE_EVENT: &str = "auxiliary-window:release";
 const PRINT_VIEW_NATIVE_CLOSE_REQUESTED_EVENT: &str = "print-view:native-close-requested";
 
@@ -222,39 +223,44 @@ pub fn run() {
     tauri::Builder::default()
         .register_uri_scheme_protocol("sigma-extension", extension_module_protocol::handle_request)
         .manage(startup_storage_bootstrap::StartupStorageBootstrapState::default())
-        .plugin(tauri_plugin_single_instance::init(|app, argv, cwd| {
-            #[cfg(windows)]
-            {
-                let filter_result = filter_shell_namespace_args(argv);
-                delegate_shell_namespace_paths(&filter_result.delegated_paths);
-                let has_filesystem_paths = filter_result.filtered_args.len() > 1;
-                let should_focus = has_filesystem_paths
-                    || filter_result.had_absorbed_paths
-                    || !filter_result.had_delegated_paths();
+        .plugin(
+            tauri_plugin_single_instance::Builder::new()
+                .dbus_id(CUSTOM_SINGLE_INSTANCE_DBUS_ID)
+                .callback(|app, argv, cwd| {
+                    #[cfg(windows)]
+                    {
+                        let filter_result = filter_shell_namespace_args(argv);
+                        delegate_shell_namespace_paths(&filter_result.delegated_paths);
+                        let has_filesystem_paths = filter_result.filtered_args.len() > 1;
+                        let should_focus = has_filesystem_paths
+                            || filter_result.had_absorbed_paths
+                            || !filter_result.had_delegated_paths();
 
-                if should_focus {
-                    system_tray::focus_main_window(app);
-                }
+                        if should_focus {
+                            system_tray::focus_main_window(app);
+                        }
 
-                if has_filesystem_paths {
-                    let had_delegated_shell_paths = filter_result.had_delegated_paths();
-                    let launch_context = build_launch_context(
-                        filter_result.filtered_args,
-                        Some(cwd),
-                        filter_result.had_absorbed_paths,
-                        had_delegated_shell_paths,
-                    );
-                    let _ = app.emit("app-launch-args", launch_context);
-                }
-            }
+                        if has_filesystem_paths {
+                            let had_delegated_shell_paths = filter_result.had_delegated_paths();
+                            let launch_context = build_launch_context(
+                                filter_result.filtered_args,
+                                Some(cwd),
+                                filter_result.had_absorbed_paths,
+                                had_delegated_shell_paths,
+                            );
+                            let _ = app.emit("app-launch-args", launch_context);
+                        }
+                    }
 
-            #[cfg(not(windows))]
-            {
-                system_tray::focus_main_window(app);
-                let launch_context = build_launch_context(argv, Some(cwd), false, false);
-                let _ = app.emit("app-launch-args", launch_context);
-            }
-        }))
+                    #[cfg(not(windows))]
+                    {
+                        system_tray::focus_main_window(app);
+                        let launch_context = build_launch_context(argv, Some(cwd), false, false);
+                        let _ = app.emit("app-launch-args", launch_context);
+                    }
+                })
+                .build(),
+        )
         .plugin(tauri_plugin_store::Builder::new().build())
         .plugin({
             use tauri_plugin_window_state::StateFlags;
@@ -494,6 +500,20 @@ fn setup_handler(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>>
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod custom_product_tests {
+    use super::CUSTOM_SINGLE_INSTANCE_DBUS_ID;
+
+    #[test]
+    fn custom_single_instance_channel_does_not_collide_with_stock_sigma() {
+        assert_eq!(
+            CUSTOM_SINGLE_INSTANCE_DBUS_ID,
+            "com.reneromero08.sigmafilemanager.custom"
+        );
+        assert_ne!(CUSTOM_SINGLE_INSTANCE_DBUS_ID, "com.sigma-file-manager.app");
+    }
 }
 
 #[cfg(all(test, windows))]
