@@ -463,6 +463,32 @@ describe('global search store', () => {
     expect(globalSearchStore.lastScanOutcome).toBe('completed');
   });
 
+  it('cancels an active commit phase', async () => {
+    invokeMock.mockImplementation(async (command: string) => {
+      if (command === 'global_search_cancel_scan') return undefined;
+
+      if (command === 'global_search_get_status') {
+        return createStatus({
+          is_scan_in_progress: false,
+          is_committing: false,
+          scan_phase: 'idle',
+          last_scan_outcome: 'canceled',
+        });
+      }
+
+      return undefined;
+    });
+
+    const globalSearchStore = useGlobalSearchStore();
+    globalSearchStore.isCommitting = true;
+    globalSearchStore.scanPhase = 'committing';
+    await globalSearchStore.cancelScan();
+
+    expect(invokeMock).toHaveBeenCalledWith('global_search_cancel_scan');
+    expect(globalSearchStore.isCommitting).toBe(false);
+    expect(globalSearchStore.lastScanOutcome).toBe('canceled');
+  });
+
   it('does not auto-start on launch when manual cancel suppression is active', async () => {
     const now = Date.now();
     userSettings.globalSearch.lastManualCancelTime = now;

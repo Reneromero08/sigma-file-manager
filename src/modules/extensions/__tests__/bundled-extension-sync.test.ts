@@ -172,6 +172,102 @@ describe('syncBundledExtension', () => {
     expect(refreshFromSource).not.toHaveBeenCalled();
   });
 
+  it('adopts exact bundled files when the managed marker is missing', async () => {
+    const markers = markerStore();
+    const refreshFromSource = vi.fn();
+
+    const result = await syncBundledExtension({
+      extensionId,
+      sourcePath: '/tmp/.mount-new/resources/bundled-extension',
+      preview: {
+        extensionId,
+        version: '0.4.0',
+      },
+      markerStore: markers,
+      getInstalledExtension: () => installedExtension({
+        localSourcePath: '/tmp/.mount-old/resources/bundled-extension',
+      }),
+      isInstalledExtensionComplete: vi.fn(async () => true),
+      installFromSource: vi.fn(),
+      refreshFromSource,
+    });
+
+    expect(result).toBe('adopted');
+    expect(markers.value).toBe('managed');
+    expect(refreshFromSource).not.toHaveBeenCalled();
+  });
+
+  it('adopts exact disabled bundled files without enabling them', async () => {
+    const markers = markerStore();
+    const installed = installedExtension({ enabled: false });
+
+    const result = await syncBundledExtension({
+      extensionId,
+      sourcePath,
+      preview: {
+        extensionId,
+        version: '0.4.0',
+      },
+      markerStore: markers,
+      getInstalledExtension: () => installed,
+      isInstalledExtensionComplete: vi.fn(async () => true),
+      installFromSource: vi.fn(),
+      refreshFromSource: vi.fn(),
+    });
+
+    expect(result).toBe('adopted');
+    expect(installed.enabled).toBe(false);
+    expect(markers.value).toBe('managed');
+  });
+
+  it('preserves a same-version developer copy with different content', async () => {
+    const markers = markerStore();
+    const refreshFromSource = vi.fn();
+
+    const result = await syncBundledExtension({
+      extensionId,
+      sourcePath,
+      preview: {
+        extensionId,
+        version: '0.4.0',
+      },
+      markerStore: markers,
+      getInstalledExtension: () => installedExtension({
+        localSourcePath: '/developer/extensions/universal-library',
+      }),
+      isInstalledExtensionComplete: vi.fn(async () => false),
+      installFromSource: vi.fn(),
+      refreshFromSource,
+    });
+
+    expect(result).toBe('skipped-user-extension');
+    expect(markers.value).toBeNull();
+    expect(refreshFromSource).not.toHaveBeenCalled();
+  });
+
+  it('preserves intentional uninstall state even if files remain registered', async () => {
+    const isInstalledExtensionComplete = vi.fn();
+    const refreshFromSource = vi.fn();
+
+    const result = await syncBundledExtension({
+      extensionId,
+      sourcePath,
+      preview: {
+        extensionId,
+        version: '0.4.0',
+      },
+      markerStore: markerStore(BUNDLED_EXTENSION_UNINSTALLED_MARKER),
+      getInstalledExtension: () => installedExtension(),
+      isInstalledExtensionComplete,
+      installFromSource: vi.fn(),
+      refreshFromSource,
+    });
+
+    expect(result).toBe('skipped-user-uninstalled');
+    expect(isInstalledExtensionComplete).not.toHaveBeenCalled();
+    expect(refreshFromSource).not.toHaveBeenCalled();
+  });
+
   it('keeps a current bundled extension unchanged', async () => {
     const refreshFromSource = vi.fn();
 
@@ -193,7 +289,7 @@ describe('syncBundledExtension', () => {
     expect(refreshFromSource).not.toHaveBeenCalled();
   });
 
-  it('repairs a partial or corrupt managed installation at the current version', async () => {
+  it('repairs a partial managed installation at the current version', async () => {
     let installed = installedExtension({ enabled: false });
     const refreshFromSource = vi.fn(async () => {
       installed = installedExtension({ enabled: false });
@@ -216,6 +312,53 @@ describe('syncBundledExtension', () => {
     expect(result).toBe('repaired');
     expect(refreshFromSource).toHaveBeenCalledWith(extensionId, sourcePath, '0.4.0');
     expect(installed.enabled).toBe(false);
+  });
+
+  it('repairs a corrupt managed installation at the current version', async () => {
+    let installed = installedExtension();
+    const refreshFromSource = vi.fn(async () => {
+      installed = installedExtension();
+    });
+
+    const result = await syncBundledExtension({
+      extensionId,
+      sourcePath,
+      preview: {
+        extensionId,
+        version: '0.4.0',
+      },
+      markerStore: markerStore('managed'),
+      getInstalledExtension: () => installed,
+      isInstalledExtensionComplete: vi.fn(async () => false),
+      installFromSource: vi.fn(),
+      refreshFromSource,
+    });
+
+    expect(result).toBe('repaired');
+    expect(refreshFromSource).toHaveBeenCalledWith(extensionId, sourcePath, '0.4.0');
+  });
+
+  it('does not reinstall exact managed files after an AppImage mount-path change', async () => {
+    const refreshFromSource = vi.fn();
+
+    const result = await syncBundledExtension({
+      extensionId,
+      sourcePath: '/tmp/.mount-new/resources/bundled-extension',
+      preview: {
+        extensionId,
+        version: '0.4.0',
+      },
+      markerStore: markerStore('managed'),
+      getInstalledExtension: () => installedExtension({
+        localSourcePath: '/tmp/.mount-old/resources/bundled-extension',
+      }),
+      isInstalledExtensionComplete: vi.fn(async () => true),
+      installFromSource: vi.fn(),
+      refreshFromSource,
+    });
+
+    expect(result).toBe('current');
+    expect(refreshFromSource).not.toHaveBeenCalled();
   });
 
   it('refreshes a managed bundled extension from the current resource mount', async () => {

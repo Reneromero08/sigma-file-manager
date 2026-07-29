@@ -190,6 +190,7 @@ const indexStatus = computed(() => {
   if (globalSearchStore.scanPhase === 'canceling') return 'canceling';
   if (globalSearchStore.scanPhase === 'committing' || globalSearchStore.isCommitting) return 'committing';
   if (globalSearchStore.scanPhase === 'scanning' || globalSearchStore.isScanInProgress) return 'scanning';
+  if (!indexingEnabled.value || selectedDriveRoots.value.length === 0) return 'disabled';
   if (globalSearchStore.driveScanErrors.length > 0 && globalSearchStore.indexedItemCount === 0) return 'error';
   if (globalSearchStore.indexedItemCount === 0) return 'empty';
   if (!globalSearchStore.lastScanTime) return 'empty';

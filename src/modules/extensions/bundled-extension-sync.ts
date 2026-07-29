@@ -23,6 +23,7 @@ export type BundledExtensionMarkerStore = {
 
 export type BundledExtensionSyncResult
   = 'installed'
+    | 'adopted'
     | 'refreshed'
     | 'repaired'
     | 'current'
@@ -120,11 +121,31 @@ export async function syncBundledExtension(
     return 'installed';
   }
 
-  if (!isManagedMarker(marker) || !installed.isLocal) {
+  if (isUninstalledMarker(marker)) {
+    return 'skipped-user-uninstalled';
+  }
+
+  if (!installed.isLocal) {
+    return 'skipped-user-extension';
+  }
+
+  if (marker !== null && !isManagedMarker(marker)) {
     return 'skipped-user-extension';
   }
 
   const installedExtensionComplete = await isInstalledExtensionComplete();
+
+  if (marker === null) {
+    if (!installedExtensionComplete) {
+      return 'skipped-user-extension';
+    }
+
+    markerStore.set(extensionId, BUNDLED_EXTENSION_MANAGED_MARKER);
+
+    if (installed.version === preview.version) {
+      return 'adopted';
+    }
+  }
 
   if (installed.version === preview.version && installedExtensionComplete) {
     return 'current';

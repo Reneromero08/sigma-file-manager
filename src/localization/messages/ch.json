@@ -131,7 +131,8 @@
       "committing": "正在保存索引",
       "outdated": "已过期",
       "empty": "无数据",
-      "error": "错误"
+      "error": "错误",
+      "disabled": "Disabled"
     },
     "relativeTime": {
       "justNow": "刚刚",
@@ -146,7 +147,20 @@
       "indexed": "索引于 {time}",
       "nothingFound": "什么都没找到"
     },
-    "showSearchSettings": "显示搜索设置"
+    "showSearchSettings": "显示搜索设置",
+    "indexingControl": {
+      "label": "Sigma indexing",
+      "ariaLabel": "Sigma global indexing status",
+      "stop": "Stop",
+      "disable": "Disable",
+      "status": {
+        "disabled": "Disabled",
+        "idle": "Idle",
+        "indexing": "Indexing",
+        "stopping": "Stopping",
+        "error": "Error"
+      }
+    }
   },
   "home": {
     "mediaBannerOptions": "媒体横幅选项",

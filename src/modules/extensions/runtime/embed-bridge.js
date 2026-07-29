@@ -101,15 +101,22 @@ function translateExtensionMessage(key, params) {
   return formatMessage(translated, params);
 }
 
-function callHost(method, ...args) {
-  const callId = 'api-' + Date.now() + '-' + Math.random().toString(36).slice(2, 10);
+function postToParent(message) {
   parent.postMessage({
     bridgeToken,
+    attemptToken,
+    ...message,
+  }, '*');
+}
+
+function callHost(method, ...args) {
+  const callId = 'api-' + Date.now() + '-' + Math.random().toString(36).slice(2, 10);
+  postToParent({
     type: 'api-call',
     id: callId,
     method,
     args,
-  }, '*');
+  });
   return new Promise((resolve, reject) => {
     pending.set(callId, { resolve, reject });
   });
@@ -184,7 +191,11 @@ document.createElement = function shimCreateElement(tagName, options) {
 
 window.addEventListener('message', async (event) => {
   const message = event.data;
-  if (!message || message.bridgeToken !== bridgeToken) {
+  if (
+    !message
+    || message.bridgeToken !== bridgeToken
+    || message.attemptToken !== attemptToken
+  ) {
     return;
   }
 
@@ -222,31 +233,28 @@ window.addEventListener('message', async (event) => {
     const handler = embedModalHandlers.get(message.handlerId);
 
     if (!handler) {
-      parent.postMessage({
-        bridgeToken,
+      postToParent({
         type: 'embed-handler-result',
         requestId: message.requestId,
         error: `Missing embed modal handler: ${message.handlerId}`,
-      }, '*');
+      });
       return;
     }
 
     try {
       const result = await handler(...(message.args ?? []));
-      parent.postMessage({
-        bridgeToken,
+      postToParent({
         type: 'embed-handler-result',
         requestId: message.requestId,
         result,
-      }, '*');
+      });
     }
     catch (error) {
-      parent.postMessage({
-        bridgeToken,
+      postToParent({
         type: 'embed-handler-result',
         requestId: message.requestId,
         error: error instanceof Error ? error.message : String(error),
-      }, '*');
+      });
     }
   }
 });
@@ -346,20 +354,18 @@ const sigma = {
     onClipboardChange(callback) {
       const handlerId = createEmbedRequestId('clipboard');
       clipboardChangeHandlers.set(handlerId, callback);
-      parent.postMessage({
-        bridgeToken,
+      postToParent({
         type: 'embed-subscribe-clipboard',
         handlerId,
-      }, '*');
+      });
 
       return {
         dispose: () => {
           clipboardChangeHandlers.delete(handlerId);
-          parent.postMessage({
-            bridgeToken,
+          postToParent({
             type: 'embed-unsubscribe-clipboard',
             handlerId,
-          }, '*');
+          });
         },
       };
     },
@@ -492,8 +498,7 @@ const sigma = {
         }
 
         window.addEventListener('message', handleReady);
-        parent.postMessage({
-          bridgeToken,
+        postToParent({
           type: 'embed-create-modal',
           modalId,
           options,
@@ -503,7 +508,7 @@ const sigma = {
           selectionChangeHandlerId,
           searchChangeHandlerId,
           filterChangeHandlerId,
-        }, '*');
+        });
         setTimeout(() => {
           window.removeEventListener('message', handleReady);
           reject(new Error('Timed out waiting for embed modal setup'));
@@ -533,11 +538,10 @@ const sigma = {
         },
         close() {
           setupPromise.then(() => {
-            parent.postMessage({
-              bridgeToken,
+            postToParent({
               type: 'embed-modal-close',
               modalId,
-            }, '*');
+            });
           }).catch(() => {});
         },
         updateElement(elementId, updates) {
@@ -546,13 +550,12 @@ const sigma = {
           }
 
           setupPromise.then(() => {
-            parent.postMessage({
-              bridgeToken,
+            postToParent({
               type: 'embed-modal-update-element',
               modalId,
               elementId,
               updates,
-            }, '*');
+            });
           }).catch(() => {});
         },
         setContent(content, options) {
@@ -563,23 +566,21 @@ const sigma = {
           );
 
           setupPromise.then(() => {
-            parent.postMessage({
-              bridgeToken,
+            postToParent({
               type: 'embed-modal-set-content',
               modalId,
               content,
               options,
-            }, '*');
+            });
           }).catch(() => {});
         },
         setButtons(buttons) {
           setupPromise.then(() => {
-            parent.postMessage({
-              bridgeToken,
+            postToParent({
               type: 'embed-modal-set-buttons',
               modalId,
               buttons,
-            }, '*');
+            });
           }).catch(() => {});
         },
         setListDetail(updates) {
@@ -606,12 +607,11 @@ const sigma = {
           }
 
           return setupPromise.then(() => {
-            parent.postMessage({
-              bridgeToken,
+            postToParent({
               type: 'embed-modal-set-list-detail',
               modalId,
               updates,
-            }, '*');
+            });
           });
         },
         getListDetail() {
@@ -638,20 +638,18 @@ const sigma = {
       if (typeof onButtonClick === 'function') {
         toolbarHandlers.set(toolbarId, onButtonClick);
       }
-      parent.postMessage({
-        bridgeToken,
+      postToParent({
         type: 'render-toolbar',
         toolbarId,
         elements,
-      }, '*');
+      });
       return {
         unmount: () => {
           toolbarHandlers.delete(toolbarId);
-          parent.postMessage({
-            bridgeToken,
+          postToParent({
             type: 'unmount-toolbar',
             toolbarId,
-          }, '*');
+          });
         },
       };
     },
@@ -691,17 +689,29 @@ const sigma = {
   },
 };
 
-const mod = await import(entryModuleUrl);
-if (typeof mod.mount !== 'function') {
-  throw new Error('Extension embed script must export mount(container, context)');
+try {
+  const mod = await import(entryModuleUrl);
+  if (typeof mod.mount !== 'function') {
+    throw new Error('Extension embed script must export mount(container, context)');
+  }
+  const container = document.getElementById('app');
+  await mod.mount(container, {
+    sigma,
+    extensionId,
+    toolbarContainer: {},
+  });
+  postToParent({
+    type: 'embed-ready',
+  });
 }
-const container = document.getElementById('app');
-await mod.mount(container, {
-  sigma,
-  extensionId,
-  toolbarContainer: {},
-});
-parent.postMessage({
-  bridgeToken,
-  type: 'embed-ready',
-}, '*');
+catch (error) {
+  postToParent({
+    type: 'embed-failed',
+    stage: 'entry-module',
+    error: {
+      name: error instanceof Error ? error.name : 'Error',
+      message: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+    },
+  });
+}

@@ -160,7 +160,8 @@
       "committing": "Shranjevanje indeksa",
       "outdated": "Zastarelo",
       "empty": "Ni podatkov",
-      "error": "Napaka"
+      "error": "Napaka",
+      "disabled": "Disabled"
     },
     "relativeTime": {
       "justNow": "Takoj",
@@ -175,7 +176,20 @@
       "indexed": "Indeksirano {time}",
       "nothingFound": "Nič ni bilo najdeno"
     },
-    "showSearchSettings": "Pokaži nastavitve iskanja"
+    "showSearchSettings": "Pokaži nastavitve iskanja",
+    "indexingControl": {
+      "label": "Sigma indexing",
+      "ariaLabel": "Sigma global indexing status",
+      "stop": "Stop",
+      "disable": "Disable",
+      "status": {
+        "disabled": "Disabled",
+        "idle": "Idle",
+        "indexing": "Indexing",
+        "stopping": "Stopping",
+        "error": "Error"
+      }
+    }
   },
   "home": {
     "mediaBannerOptions": "Možnosti medijskega pasice",

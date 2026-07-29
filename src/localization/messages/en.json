@@ -154,7 +154,21 @@
     "indexSize": "Index size",
     "scanning": "Indexing",
     "scanningInParallel": "Indexing all drives in parallel",
+    "indexingControl": {
+      "label": "Sigma indexing",
+      "ariaLabel": "Sigma global indexing status",
+      "stop": "Stop",
+      "disable": "Disable",
+      "status": {
+        "disabled": "Disabled",
+        "idle": "Idle",
+        "indexing": "Indexing",
+        "stopping": "Stopping",
+        "error": "Error"
+      }
+    },
     "indexStatus": {
+      "disabled": "Disabled",
       "ready": "Ready",
       "scanning": "Indexing",
       "committing": "Saving index",

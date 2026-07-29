@@ -325,7 +325,7 @@ export const useGlobalSearchStore = defineStore('globalSearch', () => {
   }
 
   async function cancelScan(options: CancelScanOptions = {}) {
-    if (!isScanInProgress.value) return;
+    if (!isScanInProgress.value && !isCommitting.value) return;
 
     try {
       await invoke('global_search_cancel_scan');
@@ -348,7 +348,7 @@ export const useGlobalSearchStore = defineStore('globalSearch', () => {
       while (waited < maxWaitMs) {
         await refreshStatus();
 
-        if (!isScanInProgress.value) {
+        if (!isScanInProgress.value && !isCommitting.value) {
           break;
         }
 

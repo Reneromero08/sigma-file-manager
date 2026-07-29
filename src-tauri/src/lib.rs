@@ -13,6 +13,7 @@ mod delete_job;
 mod dir_reader;
 mod dir_size;
 mod dir_watcher;
+mod extension_module_protocol;
 mod extensions;
 mod file_operations;
 mod global_search;
@@ -219,6 +220,7 @@ fn get_launch_context() -> LaunchContext {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .register_uri_scheme_protocol("sigma-extension", extension_module_protocol::handle_request)
         .manage(startup_storage_bootstrap::StartupStorageBootstrapState::default())
         .plugin(tauri_plugin_single_instance::init(|app, argv, cwd| {
             #[cfg(windows)]

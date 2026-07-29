@@ -4,3 +4,4 @@
 
 export { default as GlobalSearchToolbarButton } from './global-search-toolbar-button.vue';
 export { default as GlobalSearchView } from './global-search-view.vue';
+export { default as GlobalIndexingStatus } from './global-indexing-status.vue';

@@ -127,7 +127,8 @@
       "committing": "در حال ذخیره شاخص",
       "outdated": "منسوخ شده",
       "empty": "بدون داده",
-      "error": "خطا"
+      "error": "خطا",
+      "disabled": "Disabled"
     },
     "relativeTime": {
       "justNow": "همین الان",
@@ -142,7 +143,20 @@
       "indexed": "شاخص‌گذاری شده {time}",
       "nothingFound": "هیچ چیزی پیدا نشد"
     },
-    "showSearchSettings": "نمایش تنظیمات جستجو"
+    "showSearchSettings": "نمایش تنظیمات جستجو",
+    "indexingControl": {
+      "label": "Sigma indexing",
+      "ariaLabel": "Sigma global indexing status",
+      "stop": "Stop",
+      "disable": "Disable",
+      "status": {
+        "disabled": "Disabled",
+        "idle": "Idle",
+        "indexing": "Indexing",
+        "stopping": "Stopping",
+        "error": "Error"
+      }
+    }
   },
   "home": {
     "mediaBannerOptions": "گزینه های بنر رسانه",
