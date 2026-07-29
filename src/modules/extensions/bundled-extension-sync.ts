@@ -7,6 +7,8 @@ import type { InstalledExtensionData } from '@/types/extension';
 export const BUNDLED_UNIVERSAL_LIBRARY_ID = 'reneromero08.universal-library';
 export const BUNDLED_UNIVERSAL_LIBRARY_RESOURCE_PATH = 'bundled-extensions/reneromero08.universal-library';
 export const BUNDLED_EXTENSION_MARKER_PREFIX = 'sigma.bundled-extension.managed:';
+export const BUNDLED_EXTENSION_MANAGED_MARKER = 'managed';
+export const BUNDLED_EXTENSION_UNINSTALLED_MARKER = 'uninstalled';
 
 export type BundledExtensionManifestPreview = {
   extensionId: string;
@@ -21,7 +23,9 @@ export type BundledExtensionMarkerStore = {
 
 export type BundledExtensionSyncResult
   = 'installed'
+    | 'adopted'
     | 'refreshed'
+    | 'repaired'
     | 'current'
     | 'cancelled'
     | 'skipped-user-extension'
@@ -33,6 +37,7 @@ export type BundledExtensionSyncOptions = {
   preview: BundledExtensionManifestPreview;
   markerStore: BundledExtensionMarkerStore;
   getInstalledExtension: () => InstalledExtensionData | undefined;
+  isInstalledExtensionComplete: () => Promise<boolean>;
   installFromSource: (sourcePath: string) => Promise<void>;
   refreshFromSource: (
     extensionId: string,
@@ -55,7 +60,22 @@ export function createLocalStorageBundledExtensionMarkerStore(
 }
 
 function isManagedMarker(value: string | null): boolean {
-  return value === 'managed';
+  return value === BUNDLED_EXTENSION_MANAGED_MARKER;
+}
+
+function isUninstalledMarker(value: string | null): boolean {
+  return value === BUNDLED_EXTENSION_UNINSTALLED_MARKER;
+}
+
+export function markBundledExtensionIntentionallyUninstalled(
+  storage: Pick<Storage, 'getItem' | 'setItem'>,
+  extensionId: string,
+): void {
+  const markerStore = createLocalStorageBundledExtensionMarkerStore(storage);
+
+  if (isManagedMarker(markerStore.get(extensionId))) {
+    markerStore.set(extensionId, BUNDLED_EXTENSION_UNINSTALLED_MARKER);
+  }
 }
 
 export async function syncBundledExtension(
@@ -67,6 +87,7 @@ export async function syncBundledExtension(
     preview,
     markerStore,
     getInstalledExtension,
+    isInstalledExtensionComplete,
     installFromSource,
     refreshFromSource,
   } = options;
@@ -81,7 +102,7 @@ export async function syncBundledExtension(
   const installed = getInstalledExtension();
 
   if (!installed) {
-    if (isManagedMarker(marker)) {
+    if (isUninstalledMarker(marker)) {
       return 'skipped-user-uninstalled';
     }
 
@@ -96,15 +117,37 @@ export async function syncBundledExtension(
       return 'skipped-user-extension';
     }
 
-    markerStore.set(extensionId, 'managed');
+    markerStore.set(extensionId, BUNDLED_EXTENSION_MANAGED_MARKER);
     return 'installed';
   }
 
-  if (!isManagedMarker(marker) || !installed.isLocal) {
+  if (isUninstalledMarker(marker)) {
+    return 'skipped-user-uninstalled';
+  }
+
+  if (!installed.isLocal) {
     return 'skipped-user-extension';
   }
 
-  if (installed.version === preview.version) {
+  if (marker !== null && !isManagedMarker(marker)) {
+    return 'skipped-user-extension';
+  }
+
+  const installedExtensionComplete = await isInstalledExtensionComplete();
+
+  if (marker === null) {
+    if (!installedExtensionComplete) {
+      return 'skipped-user-extension';
+    }
+
+    markerStore.set(extensionId, BUNDLED_EXTENSION_MANAGED_MARKER);
+
+    if (installed.version === preview.version) {
+      return 'adopted';
+    }
+  }
+
+  if (installed.version === preview.version && installedExtensionComplete) {
     return 'current';
   }
 
@@ -115,6 +158,6 @@ export async function syncBundledExtension(
     throw new Error(`Bundled extension refresh did not install version ${preview.version}`);
   }
 
-  markerStore.set(extensionId, 'managed');
-  return 'refreshed';
+  markerStore.set(extensionId, BUNDLED_EXTENSION_MANAGED_MARKER);
+  return installed.version === preview.version ? 'repaired' : 'refreshed';
 }

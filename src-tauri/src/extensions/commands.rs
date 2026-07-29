@@ -112,6 +112,15 @@ pub async fn read_local_extension_manifest(
 }
 
 #[tauri::command]
+pub async fn installed_local_extension_matches_source(
+    app_handle: tauri::AppHandle,
+    extension_id: String,
+    source_path: String,
+) -> Result<bool, String> {
+    install::installed_local_extension_matches_source(app_handle, extension_id, source_path).await
+}
+
+#[tauri::command]
 pub async fn install_local_extension(
     app_handle: tauri::AppHandle,
     source_path: String,

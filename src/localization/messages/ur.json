@@ -160,7 +160,8 @@
       "committing": "انڈیکس محفوظ ہو رہا ہے",
       "outdated": "پرانا",
       "empty": "کوئی ڈیٹا نہیں",
-      "error": "خرابی"
+      "error": "خرابی",
+      "disabled": "Disabled"
     },
     "relativeTime": {
       "justNow": "ابھی ابھی",
@@ -175,7 +176,20 @@
       "indexed": "انڈیکس {time}",
       "nothingFound": "کچھ نہیں ملا"
     },
-    "showSearchSettings": "تلاش کی ترتیبات دکھائیں"
+    "showSearchSettings": "تلاش کی ترتیبات دکھائیں",
+    "indexingControl": {
+      "label": "Sigma indexing",
+      "ariaLabel": "Sigma global indexing status",
+      "stop": "Stop",
+      "disable": "Disable",
+      "status": {
+        "disabled": "Disabled",
+        "idle": "Idle",
+        "indexing": "Indexing",
+        "stopping": "Stopping",
+        "error": "Error"
+      }
+    }
   },
   "home": {
     "mediaBannerOptions": "میڈیا بینر اختیارات",

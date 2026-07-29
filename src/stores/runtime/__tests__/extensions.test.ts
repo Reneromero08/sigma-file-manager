@@ -17,6 +17,9 @@ const {
   unloadExtensionRuntimeMock,
   reactivateExtensionRuntimeMock,
   clearBinaryDownloadCountMock,
+  getPlatformBinaryDefinitionsMock,
+  promptBinarySetupMock,
+  syncManifestBinariesMock,
   commandRegistrations,
   keybindingRegistrations,
   sidebarRegistrations,
@@ -29,6 +32,9 @@ const {
   unloadExtensionRuntimeMock: vi.fn(),
   reactivateExtensionRuntimeMock: vi.fn(),
   clearBinaryDownloadCountMock: vi.fn(),
+  getPlatformBinaryDefinitionsMock: vi.fn(),
+  promptBinarySetupMock: vi.fn(),
+  syncManifestBinariesMock: vi.fn(),
   commandRegistrations: [] as Array<{
     extensionId: string;
     command: {
@@ -103,6 +109,16 @@ vi.mock('@/modules/extensions/runtime/loader', () => ({
   loadExtensionRuntime: loadExtensionRuntimeMock,
   unloadExtensionRuntime: unloadExtensionRuntimeMock,
   reactivateExtensionRuntime: reactivateExtensionRuntimeMock,
+}));
+
+vi.mock('@/modules/extensions/runtime/manifest-binaries', () => ({
+  syncManifestBinariesForExtension: syncManifestBinariesMock,
+}));
+
+vi.mock('@/modules/extensions/utils/extension-binary-setup-state', () => ({
+  getPlatformBinaryDefinitions: getPlatformBinaryDefinitionsMock,
+  promptBinarySetup: promptBinarySetupMock,
+  shouldPromptBinarySetupForUpdate: () => false,
 }));
 
 vi.mock('@/modules/extensions/api', () => ({
@@ -237,6 +253,31 @@ function createRemoteManifest(extensionId: string, repository: string): ApiExten
   };
 }
 
+function createBundledUniversalLibraryManifest(): ApiExtensionManifest {
+  return {
+    ...createManifest(),
+    id: 'reneromero08.universal-library',
+    name: 'Universal Library',
+    version: '0.8.0',
+    repository: 'https://github.com/Reneromero08/sigma-file-manager',
+    binaries: [
+      {
+        id: 'universal-library-catalog',
+        name: 'Universal Library Catalog',
+        version: '0.2.0',
+        assets: [
+          {
+            platform: 'windows',
+            arch: ['x64'],
+            downloadUrl: 'https://example.com/ulib.zip',
+            integrity: 'sha256:1111111111111111111111111111111111111111111111111111111111111111',
+          },
+        ],
+      },
+    ],
+  };
+}
+
 function getMainBranchManifestUrl(repository: string): string {
   const repositoryMatch = repository.match(/^https:\/\/github\.com\/([^/]+)\/([^/]+)$/);
 
@@ -293,6 +334,111 @@ describe('extensions runtime store', () => {
     unloadExtensionRuntimeMock.mockReset();
     reactivateExtensionRuntimeMock.mockReset();
     clearBinaryDownloadCountMock.mockReset();
+    getPlatformBinaryDefinitionsMock.mockReset().mockResolvedValue([]);
+    promptBinarySetupMock.mockReset().mockResolvedValue(true);
+    syncManifestBinariesMock.mockReset().mockResolvedValue(undefined);
+  });
+
+  it('registers the bundled workspace without downloading ulib before consent', async () => {
+    const manifest = createBundledUniversalLibraryManifest();
+    invokeMock.mockImplementation(async (command: string) => {
+      if (
+        command === 'register_extension_install_cancellation'
+        || command === 'clear_extension_install_cancellation'
+      ) {
+        return undefined;
+      }
+
+      if (command === 'read_local_extension_manifest') {
+        return {
+          extensionId: manifest.id,
+          name: manifest.name,
+          version: manifest.version,
+        };
+      }
+
+      if (command === 'install_local_extension') {
+        return {
+          success: true,
+          extension_id: manifest.id,
+          version: manifest.version,
+        };
+      }
+
+      if (command === 'read_extension_manifest') {
+        return JSON.stringify(manifest);
+      }
+
+      throw new Error(`Unexpected invoke command: ${command}`);
+    });
+    loadExtensionRuntimeMock.mockImplementation(async (extensionId: string) => {
+      sidebarRegistrations.push({
+        extensionId,
+        page: {
+          id: `${extensionId}.library`,
+          title: 'Universal Library',
+          icon: 'library',
+        },
+      });
+    });
+    getPlatformBinaryDefinitionsMock.mockResolvedValue(manifest.binaries);
+    const extensionsStore = useExtensionsStore();
+    const storageStore = useExtensionsStorageStore();
+    const addInstalledExtensionSpy = vi.spyOn(storageStore, 'addInstalledExtension');
+
+    await extensionsStore.installLocalExtension('/bundled/universal-library', {
+      deferBinarySetup: true,
+    });
+
+    expect(addInstalledExtensionSpy).toHaveBeenCalledWith(
+      manifest.id,
+      manifest.version,
+      manifest,
+      expect.objectContaining({
+        installPendingDependencies: false,
+      }),
+    );
+    expect(promptBinarySetupMock).not.toHaveBeenCalled();
+    expect(syncManifestBinariesMock).not.toHaveBeenCalled();
+    expect(loadExtensionRuntimeMock).toHaveBeenCalledWith(
+      manifest.id,
+      manifest,
+      'onStartup',
+    );
+    expect(extensionsStore.sidebarPages).toEqual([
+      expect.objectContaining({
+        extensionId: manifest.id,
+        page: expect.objectContaining({ title: 'Universal Library' }),
+      }),
+    ]);
+    expect(storageStore.extensionsData.installedExtensions[manifest.id])
+      .toMatchObject({
+        enabled: true,
+        installPendingDependencies: false,
+      });
+  });
+
+  it('does not allow other local extensions to bypass binary consent', async () => {
+    invokeMock.mockImplementation(async (command: string) => {
+      if (command === 'read_local_extension_manifest') {
+        return {
+          extensionId: 'developer.extension',
+          name: 'Developer Extension',
+          version: '1.0.0',
+        };
+      }
+
+      throw new Error(`Unexpected invoke command: ${command}`);
+    });
+    const extensionsStore = useExtensionsStore();
+
+    await expect(extensionsStore.installLocalExtension('/developer/extension', {
+      deferBinarySetup: true,
+    })).rejects.toThrow(/restricted to the bundled Universal Library/);
+    expect(invokeMock).not.toHaveBeenCalledWith(
+      'install_local_extension',
+      expect.anything(),
+    );
   });
 
   it('dedupes concurrent extension loads while activation is pending', async () => {

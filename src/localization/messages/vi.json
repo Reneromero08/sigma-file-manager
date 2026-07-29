@@ -131,7 +131,8 @@
       "committing": "Đang lưu chỉ mục",
       "outdated": "Đã lỗi thời",
       "empty": "Không có dữ liệu",
-      "error": "Lỗi"
+      "error": "Lỗi",
+      "disabled": "Disabled"
     },
     "relativeTime": {
       "justNow": "Vừa xong",
@@ -146,7 +147,20 @@
       "indexed": "Được lập chỉ mục {time}",
       "nothingFound": "Không tìm thấy gì"
     },
-    "showSearchSettings": "Hiển thị cài đặt tìm kiếm"
+    "showSearchSettings": "Hiển thị cài đặt tìm kiếm",
+    "indexingControl": {
+      "label": "Sigma indexing",
+      "ariaLabel": "Sigma global indexing status",
+      "stop": "Stop",
+      "disable": "Disable",
+      "status": {
+        "disabled": "Disabled",
+        "idle": "Idle",
+        "indexing": "Indexing",
+        "stopping": "Stopping",
+        "error": "Error"
+      }
+    }
   },
   "home": {
     "mediaBannerOptions": "Tùy chọn biểu ngữ phương tiện",

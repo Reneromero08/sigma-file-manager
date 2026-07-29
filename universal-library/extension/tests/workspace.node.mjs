@@ -147,6 +147,21 @@ test('mounts a live catalog workspace with waveform cards and audio facts', asyn
   assert.equal(typeof toolbarHandler, 'function');
 });
 
+test('mounts with a bounded unavailable state when the catalog is not configured', async () => {
+  const { mount } = await import(`../ui/workspace.js?unavailable=${Date.now()}`);
+  const container = document.getElementById('app');
+  const sigma = createSigma();
+  sigma.commands.executeCommand = async () => {
+    throw new Error('The Universal Library catalog executable is unavailable.');
+  };
+
+  await mount(container, { sigma, toolbarContainer: {} });
+
+  assert.match(container.querySelector('[data-role="status"]').textContent, /Catalog unavailable/);
+  assert.equal(container.querySelectorAll('.ul-asset-card').length, 0);
+  assert.equal(typeof toolbarHandler, 'function');
+});
+
 test('copies the selected online asset to the native file clipboard', async () => {
   const { mount } = await import(`../ui/workspace.js?copy=${Date.now()}`);
   const container = document.getElementById('app');

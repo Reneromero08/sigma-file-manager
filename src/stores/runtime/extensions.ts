@@ -101,6 +101,10 @@ import type { ShortcutKeys } from '@/types/user-settings';
 import type { ExtensionKeybindingWhen } from '@/types/extension';
 import { clearInstalledIconThemeCache } from '@/modules/icon-theme/extension-icon-themes';
 import { resetNavigatorIconThemesForExtension } from '@/modules/icon-theme/navigator-icon-theme-settings';
+import {
+  BUNDLED_UNIVERSAL_LIBRARY_ID,
+  markBundledExtensionIntentionallyUninstalled,
+} from '@/modules/extensions/bundled-extension-sync';
 
 export const useExtensionsStore = defineStore('extensions', () => {
   const storageStore = useExtensionsStorageStore();
@@ -464,14 +468,20 @@ export const useExtensionsStore = defineStore('extensions', () => {
     extensionId: string,
     manifest: ExtensionManifest,
     activationEvent: ExtensionActivationEvent,
-    options: { shouldLoadOnStartup?: boolean } = {},
+    options: {
+      shouldLoadOnStartup?: boolean;
+      syncManifestBinaries?: boolean;
+    } = {},
   ): Promise<void> {
     brokenExtensionIds.value = new Set([...brokenExtensionIds.value].filter(id => id !== extensionId));
 
     clearBinaryDownloadCount(extensionId);
     clearBinaryReuseCount(extensionId);
 
-    await syncManifestBinariesForExtension(extensionId, manifest);
+    if (options.syncManifestBinaries !== false) {
+      await syncManifestBinariesForExtension(extensionId, manifest);
+    }
+
     await loadExtensionForEvent(extensionId, manifest, activationEvent, { allowWhenDisabled: true });
 
     const shouldLoadOnStartup = options.shouldLoadOnStartup ?? shouldActivateOnStartup(manifest);
@@ -486,12 +496,19 @@ export const useExtensionsStore = defineStore('extensions', () => {
     manifest: ExtensionManifest,
     version: string,
     storageOptions: Parameters<typeof storageStore.addInstalledExtension>[3],
+    options: { deferBinarySetup?: boolean } = {},
   ): Promise<void> {
     await storageStore.addInstalledExtension(extensionId, version, manifest, storageOptions);
     clearInstalledIconThemeCache();
-    await finalizeExtensionActivation(extensionId, manifest, 'onInstall');
+    await finalizeExtensionActivation(extensionId, manifest, 'onInstall', {
+      syncManifestBinaries: !options.deferBinarySetup,
+    });
     await storageStore.completeExtensionInstall(extensionId);
-    showDependenciesInstalledToast(extensionId);
+
+    if (!options.deferBinarySetup) {
+      showDependenciesInstalledToast(extensionId);
+    }
+
     showThemesInstalledToast(extensionId, manifest);
   }
 
@@ -931,7 +948,10 @@ export const useExtensionsStore = defineStore('extensions', () => {
     version: string;
   };
 
-  async function installLocalExtension(sourcePath: string): Promise<void> {
+  async function installLocalExtension(
+    sourcePath: string,
+    options: { deferBinarySetup?: boolean } = {},
+  ): Promise<void> {
     return runInInstallQueue(async () => {
       const manifestPreview = await invoke<LocalExtensionManifestPreview>('read_local_extension_manifest', {
         sourcePath,
@@ -940,6 +960,13 @@ export const useExtensionsStore = defineStore('extensions', () => {
       const folderInstallDisplayName = manifestPreview.name
         || extensionId.split('.').pop()
         || extensionId;
+
+      if (
+        options.deferBinarySetup
+        && extensionId !== BUNDLED_UNIVERSAL_LIBRARY_ID
+      ) {
+        throw new Error('Deferred binary setup is restricted to the bundled Universal Library');
+      }
 
       const { signal } = await beginExtensionInstall(extensionId);
       installingExtensions.value.add(extensionId);
@@ -985,18 +1012,22 @@ export const useExtensionsStore = defineStore('extensions', () => {
 
         throwIfInstallAborted(signal);
 
-        await ensureBinarySetupConfirmed(
-          extensionId,
-          manifest.name || folderInstallDisplayName,
-          manifest,
-        );
+        if (!options.deferBinarySetup) {
+          await ensureBinarySetupConfirmed(
+            extensionId,
+            manifest.name || folderInstallDisplayName,
+            manifest,
+          );
+        }
 
         throwIfInstallAborted(signal);
 
         await completeNewExtensionInstall(extensionId, manifest, manifest.version, {
           isLocal: true,
           localSourcePath: sourcePath,
-          installPendingDependencies: true,
+          installPendingDependencies: !options.deferBinarySetup,
+        }, {
+          deferBinarySetup: options.deferBinarySetup,
         });
         persistedInstall = true;
       }
@@ -1160,6 +1191,10 @@ export const useExtensionsStore = defineStore('extensions', () => {
 
   async function uninstallExtension(extensionId: string): Promise<void> {
     await removeInstalledExtension(extensionId);
+
+    if (extensionId === BUNDLED_UNIVERSAL_LIBRARY_ID) {
+      markBundledExtensionIntentionallyUninstalled(window.localStorage, extensionId);
+    }
   }
 
   async function updateExtension(

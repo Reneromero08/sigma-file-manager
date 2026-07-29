@@ -22,6 +22,7 @@ import { isWslPath } from '@/utils/normalize-path';
 import type { DirEntry } from '@/types/dir-entry';
 import { determineFileType } from '@/stores/runtime/quick-view';
 import { decodeTextFileBytesWithEncoding } from '@/utils/decode-text-file-bytes';
+import { useMediaStreamUrl } from '@/composables/use-media-stream-url';
 
 const { t } = useI18n();
 
@@ -37,6 +38,16 @@ const props = defineProps<{
   isCurrentDir?: boolean;
 }>();
 
+const infoPanelPreviewKind = computed(() => {
+  const entry = props.selectedEntry;
+
+  if (!entry?.path || entry.is_dir) {
+    return null;
+  }
+
+  return determineFileType(entry.path);
+});
+
 const {
   previewRef,
   isImageFile,
@@ -48,22 +59,24 @@ const {
   videoPreviewRef,
   isVideoFile,
   muteVideoPreviewByDefault,
+  tryAutoplayVideoPreview,
 } = useInfoPanelVideoPreview(() => props.selectedEntry);
+
+const { mediaStreamUrl } = useMediaStreamUrl(
+  () => props.selectedEntry?.path,
+  () => infoPanelPreviewKind.value === 'video' || infoPanelPreviewKind.value === 'audio',
+);
+
+watch(mediaStreamUrl, (url) => {
+  if (url) {
+    void tryAutoplayVideoPreview();
+  }
+});
 
 const textPreviewContent = ref('');
 const textPreviewLoading = ref(false);
 const textPreviewFailed = ref(false);
 let textPreviewRequestSequence = 0;
-
-const infoPanelPreviewKind = computed(() => {
-  const entry = props.selectedEntry;
-
-  if (!entry?.path || entry.is_dir) {
-    return null;
-  }
-
-  return determineFileType(entry.path);
-});
 
 const showWslDirectoryIcon = computed(() => {
   if (!props.selectedEntry?.is_dir) return false;
@@ -176,7 +189,7 @@ watch(
     >
       <video
         ref="videoPreviewRef"
-        :src="mediaSrc"
+        :src="mediaStreamUrl"
         class="info-panel-preview__video animate-fade-in-x2"
         controls
         preload="metadata"
@@ -188,7 +201,7 @@ watch(
       class="info-panel-preview__media-container info-panel-preview__media-container--audio"
     >
       <audio
-        :src="mediaSrc"
+        :src="mediaStreamUrl"
         class="info-panel-preview__audio animate-fade-in-x2"
         controls
         preload="metadata"

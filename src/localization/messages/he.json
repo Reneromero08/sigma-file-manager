@@ -160,7 +160,8 @@
       "committing": "שומר את האינדקס",
       "outdated": "לא מעודכן",
       "empty": "אין נתונים",
-      "error": "שגיאה"
+      "error": "שגיאה",
+      "disabled": "Disabled"
     },
     "relativeTime": {
       "justNow": "הרגע",
@@ -175,7 +176,20 @@
       "indexed": "נוסף לאינדקס {time}",
       "nothingFound": "לא נמצא דבר"
     },
-    "showSearchSettings": "הצג הגדרות חיפוש"
+    "showSearchSettings": "הצג הגדרות חיפוש",
+    "indexingControl": {
+      "label": "Sigma indexing",
+      "ariaLabel": "Sigma global indexing status",
+      "stop": "Stop",
+      "disable": "Disable",
+      "status": {
+        "disabled": "Disabled",
+        "idle": "Idle",
+        "indexing": "Indexing",
+        "stopping": "Stopping",
+        "error": "Error"
+      }
+    }
   },
   "home": {
     "mediaBannerOptions": "אפשרויות באנר המדיה",

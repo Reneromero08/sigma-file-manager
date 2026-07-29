@@ -17,6 +17,7 @@ const {
   deleteJobsEnsureEventListenersMock,
   disableWebViewFeaturesMock,
   extensionsInitMock,
+  extensionsInstallLocalMock,
   extensionsStorageSaveMock,
   getDirEntryMock,
   globalSearchInitOnLaunchMock,
@@ -52,6 +53,7 @@ const {
   deleteJobsEnsureEventListenersMock: vi.fn(),
   disableWebViewFeaturesMock: vi.fn(),
   extensionsInitMock: vi.fn(),
+  extensionsInstallLocalMock: vi.fn(),
   extensionsStorageSaveMock: vi.fn(),
   getDirEntryMock: vi.fn(),
   globalSearchInitOnLaunchMock: vi.fn(),
@@ -234,6 +236,7 @@ vi.mock('@/stores/runtime/background-media', () => ({
 vi.mock('@/stores/runtime/extensions', () => ({
   useExtensionsStore: () => ({
     init: extensionsInitMock,
+    installLocalExtension: extensionsInstallLocalMock,
   }),
 }));
 
@@ -343,6 +346,7 @@ describe('useInit startup restoration', () => {
     deleteJobsEnsureEventListenersMock.mockReset().mockResolvedValue(undefined);
     disableWebViewFeaturesMock.mockReset();
     extensionsInitMock.mockReset().mockResolvedValue(undefined);
+    extensionsInstallLocalMock.mockReset().mockResolvedValue(undefined);
     extensionsStorageSaveMock.mockReset().mockResolvedValue(undefined);
     getDirEntryMock.mockReset().mockResolvedValue(null);
     globalSearchInitOnLaunchMock.mockReset().mockResolvedValue(undefined);
@@ -420,6 +424,29 @@ describe('useInit startup restoration', () => {
     expect(callOrder.indexOf('openOrFocusTabGroup:C:/Launch')).toBeGreaterThan(-1);
     expect(callOrder.indexOf('loadCurrentTabGroup')).toBeLessThan(
       callOrder.indexOf('openOrFocusTabGroup:C:/Launch'),
+    );
+  });
+
+  it('defers managed binary setup while bootstrapping the bundled workspace', async () => {
+    invokeMock.mockImplementation(async (command: string) => {
+      if (command === 'get_launch_context') {
+        return createLaunchContext({});
+      }
+
+      return null;
+    });
+
+    const { useInit } = await import('@/composables/use-init');
+    const { init, awaitBackgroundTasks } = useInit();
+
+    await completeInit(init, awaitBackgroundTasks);
+
+    const bootstrapOptions = bootstrapBundledUniversalLibraryMock.mock.calls[0]?.[0];
+    await bootstrapOptions.installLocalExtension('/bundled/universal-library');
+
+    expect(extensionsInstallLocalMock).toHaveBeenCalledWith(
+      '/bundled/universal-library',
+      { deferBinarySetup: true },
     );
   });
 

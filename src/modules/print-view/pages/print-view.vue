@@ -28,6 +28,7 @@ import {
   PRINT_VIEW_WINDOW_READY_EVENT,
   releaseAuxiliaryWindow,
 } from '@/utils/auxiliary-windows';
+import { useMediaStreamUrl } from '@/composables/use-media-stream-url';
 
 const PRINT_ROOT_CLASS = 'sfm-print-view-active';
 
@@ -68,8 +69,12 @@ const fileName = computed((): string => {
   return getFileName(currentFilePath.value);
 });
 
+const shouldUseMediaStream = computed(() => fileType.value === 'video');
+const { mediaStreamUrl } = useMediaStreamUrl(currentFilePath, shouldUseMediaStream);
+
 const fileAssetUrl = computed((): string => {
   if (!currentFilePath.value) return '';
+  if (shouldUseMediaStream.value) return mediaStreamUrl.value;
   return getQuickViewDisplayUrl(currentFilePath.value);
 });
 

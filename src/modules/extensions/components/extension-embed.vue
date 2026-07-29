@@ -4,6 +4,7 @@ Copyright © 2021 - present Aleksey Hoffman. All rights reserved.
 -->
 
 <script setup lang="ts">
+import { platform } from '@tauri-apps/plugin-os';
 import { createApp, onMounted, onUnmounted, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import ExtensionIcon from '@/modules/extensions/components/extension-icon.vue';
@@ -11,7 +12,7 @@ import ExtensionToolbarView from '@/modules/extensions/components/extension-tool
 import { getExtensionAPI } from '@/modules/extensions/runtime/loader';
 import { createExtensionApiMethodMap } from '@/modules/extensions/runtime/api-method-map';
 import { clearEmbedHostState, handleEmbedBridgeMessage } from '@/modules/extensions/runtime/embed-host-bridge';
-import { invokeAsExtension } from '@/modules/extensions/runtime/extension-invoke';
+import { createEmbedModuleUrl } from '@/modules/extensions/runtime/embed-module-url';
 import pathApiCoreScript from '@/modules/extensions/api/path-api-core.js?raw';
 import embedBridgeScript from '@/modules/extensions/runtime/embed-bridge.js?raw';
 
@@ -24,6 +25,7 @@ function getInlinePathApiScript(): string {
 
 const props = withDefaults(defineProps<{
   extensionId: string;
+  extensionVersion: string;
   embedScriptPath: string;
   iconPath?: string;
   isActive?: boolean;
@@ -35,10 +37,16 @@ const props = withDefaults(defineProps<{
 const { t } = useI18n();
 const toolbarRef = ref<HTMLDivElement | null>(null);
 const iframeRef = ref<HTMLIFrameElement | null>(null);
-const isReady = ref(false);
+const loadState = ref<'loading' | 'loaded' | 'failed'>('loading');
+const loadError = ref('');
 const bridgeToken = `embed-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+const EMBED_LOAD_TIMEOUT_MS = 20_000;
 let toolbarApp: ReturnType<typeof createApp> | null = null;
 let activeToolbarId: string | null = null;
+let activeAttemptToken = '';
+let attemptSequence = 0;
+let loadTimeout: ReturnType<typeof setTimeout> | null = null;
+let isDisposed = false;
 
 function clearToolbar() {
   if (toolbarApp) {
@@ -54,6 +62,7 @@ function postMessageToEmbed(message: Record<string, unknown>) {
   iframeRef.value?.contentWindow?.postMessage({
     ...message,
     bridgeToken,
+    attemptToken: activeAttemptToken,
   }, '*');
 }
 
@@ -79,10 +88,11 @@ function handleToolbarRender(toolbarId: string, elements: unknown[]) {
   toolbarApp.mount(container);
 }
 
-function createEmbedSrcdoc(scriptSource: string): string {
+function createEmbedSrcdoc(entryModuleUrl: string, attemptToken: string): string {
   const runtimeConstants = [
     `const bridgeToken = ${JSON.stringify(bridgeToken)};`,
-    `const scriptSource = ${JSON.stringify(scriptSource)};`,
+    `const attemptToken = ${JSON.stringify(attemptToken)};`,
+    `const entryModuleUrl = ${JSON.stringify(entryModuleUrl)};`,
     `const extensionId = ${JSON.stringify(props.extensionId)};`,
   ].join('\n');
 
@@ -92,7 +102,7 @@ function createEmbedSrcdoc(scriptSource: string): string {
     <meta charset="utf-8">
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'self' data: blob: filesystem: https: http:; style-src 'self' 'unsafe-inline' data: blob: https: http:; img-src 'self' data: blob: filesystem: https: http:; font-src 'self' data: blob: https: http:; script-src 'self' 'unsafe-inline' 'unsafe-eval' blob: filesystem: https: http:; connect-src 'self' data: blob: filesystem: https: http:;"
+      content="default-src 'none'; style-src 'unsafe-inline'; img-src data: blob: asset: http://127.0.0.1:* sigma-extension: http://sigma-extension.localhost; font-src data: blob:; media-src blob: asset: http://127.0.0.1:*; script-src 'unsafe-inline' sigma-extension: http://sigma-extension.localhost; connect-src blob: asset: http://127.0.0.1:* sigma-extension: http://sigma-extension.localhost;"
     >
     <style>
       html, body, #app {
@@ -123,6 +133,7 @@ function handleMessage(event: MessageEvent) {
 
   const message = event.data as {
     bridgeToken?: string;
+    attemptToken?: string;
     type?: string;
     id?: string;
     method?: string;
@@ -131,16 +142,38 @@ function handleMessage(event: MessageEvent) {
     buttonId?: string;
     elements?: unknown[];
     stage?: string;
-    detail?: string;
-    message?: string;
+    error?: string | {
+      name?: string;
+      message?: string;
+      stack?: string;
+    };
   };
 
-  if (!message || message.bridgeToken !== bridgeToken) {
+  if (
+    !message
+    || message.bridgeToken !== bridgeToken
+    || message.attemptToken !== activeAttemptToken
+  ) {
     return;
   }
 
   if (message.type === 'embed-ready') {
-    isReady.value = true;
+    completeAttempt('loaded');
+    return;
+  }
+
+  if (message.type === 'embed-failed') {
+    const structuredError = typeof message.error === 'object'
+      ? message.error
+      : undefined;
+    console.error('[extension-embed] workspace load failed', {
+      extensionId: props.extensionId,
+      extensionVersion: props.extensionVersion,
+      modulePath: props.embedScriptPath,
+      stage: message.stage ?? 'unknown',
+      error: message.error ?? null,
+    });
+    failAttempt(structuredError?.message ?? message.error);
     return;
   }
 
@@ -161,7 +194,10 @@ function handleMessage(event: MessageEvent) {
     const api = getExtensionAPI(props.extensionId);
 
     if (api) {
-      void handleEmbedBridgeMessage(props.extensionId, api, message, postMessageToEmbed);
+      void handleEmbedBridgeMessage(props.extensionId, api, {
+        ...message,
+        error: typeof message.error === 'string' ? message.error : undefined,
+      }, postMessageToEmbed);
     }
 
     return;
@@ -197,33 +233,81 @@ function handleMessage(event: MessageEvent) {
   }
 }
 
-async function mountEmbed() {
+function clearLoadTimeout() {
+  if (loadTimeout) {
+    clearTimeout(loadTimeout);
+    loadTimeout = null;
+  }
+}
+
+function completeAttempt(state: 'loaded' | 'failed') {
+  clearLoadTimeout();
+  loadState.value = state;
+}
+
+function failAttempt(error?: unknown) {
+  const errorMessage = error instanceof Error ? error.message : String(error ?? '');
+  loadError.value = errorMessage.slice(0, 180);
+  completeAttempt('failed');
+}
+
+function mountEmbed() {
   clearToolbar();
-  isReady.value = false;
+  clearLoadTimeout();
+  clearEmbedHostState(props.extensionId);
+  loadState.value = 'loading';
+  loadError.value = '';
+  activeAttemptToken = `attempt-${++attemptSequence}-${Date.now()}`;
 
-  const scriptPath = props.embedScriptPath.replace(/^\//, '');
-  const fileBytes = await invokeAsExtension<number[]>(props.extensionId, 'read_extension_file', {
-    extensionId: props.extensionId,
-    filePath: scriptPath,
-  });
-  const scriptSource = new TextDecoder().decode(new Uint8Array(fileBytes));
+  try {
+    const entryModuleUrl = createEmbedModuleUrl({
+      extensionId: props.extensionId,
+      extensionVersion: props.extensionVersion,
+      modulePath: props.embedScriptPath,
+      platform: platform(),
+    });
 
-  if (iframeRef.value) {
-    iframeRef.value.srcdoc = createEmbedSrcdoc(scriptSource);
+    if (!iframeRef.value) {
+      throw new Error('Extension workspace frame is unavailable');
+    }
+
+    iframeRef.value.srcdoc = createEmbedSrcdoc(entryModuleUrl, activeAttemptToken);
+    const attemptToken = activeAttemptToken;
+    loadTimeout = setTimeout(() => {
+      if (!isDisposed && attemptToken === activeAttemptToken && loadState.value === 'loading') {
+        console.error('[extension-embed] workspace load timed out', {
+          extensionId: props.extensionId,
+          extensionVersion: props.extensionVersion,
+          modulePath: props.embedScriptPath,
+        });
+        failAttempt('The extension workspace did not finish loading.');
+      }
+    }, EMBED_LOAD_TIMEOUT_MS);
+  }
+  catch (error) {
+    console.error('[extension-embed] workspace setup failed', {
+      extensionId: props.extensionId,
+      extensionVersion: props.extensionVersion,
+      modulePath: props.embedScriptPath,
+      error,
+    });
+    failAttempt(error);
   }
 }
 
 function unmountEmbed() {
+  clearLoadTimeout();
   clearToolbar();
-  isReady.value = false;
+  loadState.value = 'loading';
 }
 
 onMounted(() => {
   window.addEventListener('message', handleMessage);
-  void mountEmbed();
+  mountEmbed();
 });
 
 onUnmounted(() => {
+  isDisposed = true;
   window.removeEventListener('message', handleMessage);
   clearEmbedHostState(props.extensionId);
   unmountEmbed();
@@ -244,26 +328,44 @@ onUnmounted(() => {
       <iframe
         ref="iframeRef"
         class="extension-embed__content"
+        :data-load-state="loadState"
         sandbox="allow-scripts"
         title=""
       />
-      <Transition name="extension-embed-loader">
-        <div
-          v-if="!isReady"
-          class="extension-embed__loader"
-        >
-          <div class="extension-embed__loader-icon-wrap">
-            <ExtensionIcon
-              :extension-id="extensionId"
-              :icon-path="iconPath"
-              :size="48"
-            />
-          </div>
-          <p class="extension-embed__loader-text">
-            {{ t('extensions.loadingExtension') }}
-          </p>
+      <div
+        v-if="loadState !== 'loaded'"
+        class="extension-embed__loader"
+        :data-state="loadState"
+      >
+        <div class="extension-embed__loader-icon-wrap">
+          <ExtensionIcon
+            :extension-id="extensionId"
+            :icon-path="iconPath"
+            :size="48"
+          />
         </div>
-      </Transition>
+        <p class="extension-embed__loader-text">
+          {{
+            loadState === 'failed'
+              ? t('extensions.loadingExtensionFailed', 'Extension workspace could not be loaded.')
+              : t('extensions.loadingExtension')
+          }}
+        </p>
+        <p
+          v-if="loadState === 'failed' && loadError"
+          class="extension-embed__loader-error"
+        >
+          {{ loadError }}
+        </p>
+        <button
+          v-if="loadState === 'failed'"
+          class="extension-embed__retry"
+          type="button"
+          @click="mountEmbed"
+        >
+          {{ t('extensions.retryLoadingExtension', 'Retry') }}
+        </button>
+      </div>
     </div>
   </div>
 </template>
@@ -335,15 +437,25 @@ onUnmounted(() => {
   font-size: 0.875rem;
 }
 
-.extension-embed-loader-enter-active {
-  transition: none;
+.extension-embed__loader-error {
+  max-width: 36rem;
+  margin: -6px 24px 0;
+  color: var(--color-text-secondary);
+  font-size: 0.75rem;
+  text-align: center;
 }
 
-.extension-embed-loader-leave-active {
-  transition: opacity 0.2s ease;
+.extension-embed__retry {
+  padding: 7px 14px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-background-2);
+  color: var(--color-text);
+  cursor: pointer;
 }
 
-.extension-embed-loader-leave-to {
-  opacity: 0;
+.extension-embed__retry:hover {
+  background: var(--color-background-3);
 }
+
 </style>

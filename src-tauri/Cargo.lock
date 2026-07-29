@@ -5374,6 +5374,7 @@ dependencies = [
  "tokio-util",
  "trash",
  "urlencoding",
+ "uuid",
  "walkdir",
  "webview2-com",
  "windows 0.58.0",

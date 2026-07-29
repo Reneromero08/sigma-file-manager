@@ -71,5 +71,6 @@ export function useInfoPanelVideoPreview(selectedEntry: MaybeRefOrGetter<DirEntr
     isVideoFile,
     muteVideoPreviewByDefault,
     autoplayVideoPreview,
+    tryAutoplayVideoPreview,
   };
 }

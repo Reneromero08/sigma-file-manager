@@ -317,6 +317,24 @@ export function useBackgroundMedia(target?: BackgroundMediaTarget) {
     return '';
   }
 
+  function getMediaPlaybackSource(item: MediaItem): string {
+    if (getMediaType(item) !== 'video') {
+      return getMediaUrl(item);
+    }
+
+    if (item.kind === 'custom') {
+      return item.path;
+    }
+
+    const source = getMediaUrlSource(item);
+
+    if (source && cachedMediaPaths.value[source]) {
+      return cachedMediaPaths.value[source];
+    }
+
+    return getBuiltinPreviewUrl(item.data);
+  }
+
   async function ensureMediaCached(item: MediaItem): Promise<boolean> {
     const source = getMediaUrlSource(item);
 
@@ -524,6 +542,7 @@ export function useBackgroundMedia(target?: BackgroundMediaTarget) {
     getMediaType,
     getMediaPath,
     getMediaUrl,
+    getMediaPlaybackSource,
     getPreviewUrl,
     mediaOptions,
     resolveMediaSelectionIndex,

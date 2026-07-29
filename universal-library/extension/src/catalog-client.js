@@ -79,7 +79,7 @@ export async function resolveCatalogExecutable(options = {}) {
   const managed = await getManagedExecutablePath();
   if (managed) return managed;
 
-  if (options.promptForExecutable !== false) {
+  if (options.promptForExecutable === true) {
     const selected = await configureCatalogExecutable();
     if (selected) return selected;
   }

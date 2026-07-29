@@ -133,7 +133,7 @@ fn parse_range_header(range_value: Option<&HeaderValue>, total_size: u64) -> Opt
     Some((start, end))
 }
 
-pub(super) async fn stream_file_response(path: &Path, request_headers: &HeaderMap) -> Response {
+pub(crate) async fn stream_file_response(path: &Path, request_headers: &HeaderMap) -> Response {
     let mime = mime_guess::from_path(path)
         .first_or_octet_stream()
         .to_string();

@@ -160,7 +160,8 @@
       "committing": "Сохранение индекса",
       "outdated": "Устарел",
       "empty": "Нет данных",
-      "error": "Ошибка"
+      "error": "Ошибка",
+      "disabled": "Disabled"
     },
     "relativeTime": {
       "justNow": "Только что",
@@ -175,7 +176,20 @@
       "indexed": "Индексировано {time}",
       "nothingFound": "Ничего не найдено"
     },
-    "showSearchSettings": "Показать настройки поиска"
+    "showSearchSettings": "Показать настройки поиска",
+    "indexingControl": {
+      "label": "Sigma indexing",
+      "ariaLabel": "Sigma global indexing status",
+      "stop": "Stop",
+      "disable": "Disable",
+      "status": {
+        "disabled": "Disabled",
+        "idle": "Idle",
+        "indexing": "Indexing",
+        "stopping": "Stopping",
+        "error": "Error"
+      }
+    }
   },
   "home": {
     "mediaBannerOptions": "Параметры медиабаннера",

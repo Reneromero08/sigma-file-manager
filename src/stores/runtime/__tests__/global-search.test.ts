@@ -9,6 +9,8 @@ import { createPinia, setActivePinia } from 'pinia';
 import { nextTick } from 'vue';
 import type { GlobalSearchScanReason } from '@/stores/runtime/global-search';
 import { useGlobalSearchStore } from '@/stores/runtime/global-search';
+import { sharedDrives } from '@/modules/home/composables/use-drives';
+import type { DriveInfo } from '@/types/drive-info';
 
 const {
   invokeMock,
@@ -19,6 +21,7 @@ const {
 } = vi.hoisted(() => {
   const userSettingsState = {
     globalSearch: {
+      enabled: true as boolean | null,
       scanDepth: 7,
       autoScanPeriodMinutes: 60,
       autoReindexWhenIdle: true,
@@ -159,12 +162,31 @@ function createStatus(overrides: Partial<{
   };
 }
 
+function createDrive(path: string): DriveInfo {
+  return {
+    name: path,
+    path,
+    mount_point: path,
+    file_system: 'test',
+    drive_type: 'Fixed',
+    total_space: 1024,
+    available_space: 512,
+    used_space: 512,
+    percent_used: 50,
+    is_removable: false,
+    is_read_only: false,
+    is_mounted: true,
+    device_path: path,
+  };
+}
+
 function resetUserSettings() {
+  userSettings.globalSearch.enabled = true;
   userSettings.globalSearch.scanDepth = 7;
   userSettings.globalSearch.autoScanPeriodMinutes = 60;
   userSettings.globalSearch.autoReindexWhenIdle = true;
   userSettings.globalSearch.ignoredPaths = ['/node_modules', '/ProgramData/Microsoft'];
-  userSettings.globalSearch.selectedDriveRoots = [];
+  userSettings.globalSearch.selectedDriveRoots = ['C:/'];
   userSettings.globalSearch.parallelScan = false;
   userSettings.globalSearch.lastManualCancelTime = null;
 }
@@ -178,6 +200,7 @@ describe('global search store', () => {
     getIsUserIdleMock.mockReset();
     getIsUserIdleMock.mockReturnValue(false);
     startUserIdleDetectionMock.mockClear();
+    sharedDrives.value = [createDrive('C:/')];
     resetUserSettings();
   });
 
@@ -197,6 +220,90 @@ describe('global search store', () => {
         scan_reason: 'manual',
       }),
     });
+  });
+
+  it('performs zero root scans for a clean disabled profile', async () => {
+    userSettings.globalSearch.enabled = false;
+    userSettings.globalSearch.autoReindexWhenIdle = false;
+    userSettings.globalSearch.selectedDriveRoots = [];
+    invokeMock.mockImplementation(async (command: string) => {
+      if (command === 'global_search_init') {
+        return createStatus({
+          indexed_item_count: 0,
+          indexed_drive_roots: [],
+          is_index_valid: false,
+          last_scan_time: null,
+          last_scan_reason: null,
+        });
+      }
+
+      return undefined;
+    });
+
+    const globalSearchStore = useGlobalSearchStore();
+    await globalSearchStore.initOnLaunch();
+
+    expect(invokeMock).toHaveBeenCalledWith('global_search_init');
+    expect(invokeMock).not.toHaveBeenCalledWith('global_search_start_scan', expect.anything());
+    expect(startUserIdleDetectionMock).not.toHaveBeenCalled();
+  });
+
+  it('keeps approved roots bounded and never falls back to mounted volumes', async () => {
+    userSettings.globalSearch.enabled = true;
+    userSettings.globalSearch.selectedDriveRoots = ['/synthetic/library'];
+    invokeMock.mockImplementation(async (command: string) => {
+      if (command === 'global_search_get_status') return createStatus();
+      return undefined;
+    });
+
+    const globalSearchStore = useGlobalSearchStore();
+    await globalSearchStore.startScan();
+
+    expect(invokeMock).not.toHaveBeenCalledWith('get_system_drives');
+    expect(invokeMock).toHaveBeenCalledWith('global_search_start_scan', {
+      settings: expect.objectContaining({
+        drive_roots: ['/synthetic/library'],
+        scan_reason: 'manual',
+      }),
+    });
+  });
+
+  it('does not add a newly mounted volume to approved roots', async () => {
+    vi.useFakeTimers();
+    invokeMock.mockImplementation(async (command: string) => {
+      if (command === 'global_search_init' || command === 'global_search_get_status') {
+        return createStatus();
+      }
+
+      return undefined;
+    });
+
+    const globalSearchStore = useGlobalSearchStore();
+    await globalSearchStore.initOnLaunch();
+    invokeMock.mockClear();
+
+    sharedDrives.value.push(createDrive('D:/'));
+    await nextTick();
+    await vi.advanceTimersByTimeAsync(2000);
+
+    expect(invokeMock).toHaveBeenCalledWith('global_search_start_scan', {
+      settings: expect.objectContaining({
+        drive_roots: ['C:/'],
+        scan_reason: 'driveChange',
+      }),
+    });
+  });
+
+  it('does not scan when enabled without an explicitly approved root', async () => {
+    userSettings.globalSearch.enabled = true;
+    userSettings.globalSearch.selectedDriveRoots = [];
+
+    const globalSearchStore = useGlobalSearchStore();
+    await globalSearchStore.startScan();
+
+    expect(invokeMock).not.toHaveBeenCalledWith('get_system_drives');
+    expect(invokeMock).not.toHaveBeenCalledWith('global_search_start_scan', expect.anything());
+    expect(globalSearchStore.lastError).toBe('No drives available for scanning');
   });
 
   it('maps committed indexed drive roots from backend status', async () => {
@@ -356,6 +463,32 @@ describe('global search store', () => {
     expect(globalSearchStore.lastScanOutcome).toBe('completed');
   });
 
+  it('cancels an active commit phase', async () => {
+    invokeMock.mockImplementation(async (command: string) => {
+      if (command === 'global_search_cancel_scan') return undefined;
+
+      if (command === 'global_search_get_status') {
+        return createStatus({
+          is_scan_in_progress: false,
+          is_committing: false,
+          scan_phase: 'idle',
+          last_scan_outcome: 'canceled',
+        });
+      }
+
+      return undefined;
+    });
+
+    const globalSearchStore = useGlobalSearchStore();
+    globalSearchStore.isCommitting = true;
+    globalSearchStore.scanPhase = 'committing';
+    await globalSearchStore.cancelScan();
+
+    expect(invokeMock).toHaveBeenCalledWith('global_search_cancel_scan');
+    expect(globalSearchStore.isCommitting).toBe(false);
+    expect(globalSearchStore.lastScanOutcome).toBe('canceled');
+  });
+
   it('does not auto-start on launch when manual cancel suppression is active', async () => {
     const now = Date.now();
     userSettings.globalSearch.lastManualCancelTime = now;
@@ -376,6 +509,79 @@ describe('global search store', () => {
     await globalSearchStore.initOnLaunch();
 
     expect(invokeMock).toHaveBeenCalledWith('global_search_init');
+    expect(invokeMock).not.toHaveBeenCalledWith('global_search_start_scan', expect.anything());
+  });
+
+  it('does not start an idle scan while indexing is disabled', async () => {
+    userSettings.globalSearch.enabled = false;
+    userSettings.globalSearch.autoReindexWhenIdle = true;
+    userSettings.globalSearch.selectedDriveRoots = ['/synthetic/library'];
+    getIsUserIdleMock.mockReturnValue(true);
+    invokeMock.mockImplementation(async (command: string) => {
+      if (command === 'global_search_init') {
+        return createStatus({
+          last_scan_time: null,
+          indexed_item_count: 0,
+          is_index_valid: false,
+        });
+      }
+
+      return undefined;
+    });
+
+    const globalSearchStore = useGlobalSearchStore();
+    await globalSearchStore.initOnLaunch();
+
+    expect(startUserIdleDetectionMock).not.toHaveBeenCalled();
+    expect(invokeMock).not.toHaveBeenCalledWith('global_search_start_scan', expect.anything());
+  });
+
+  it('migrates an explicitly manual legacy index to its committed bounded roots', async () => {
+    userSettings.globalSearch.enabled = null;
+    userSettings.globalSearch.selectedDriveRoots = [];
+    invokeMock.mockImplementation(async (command: string) => {
+      if (command === 'global_search_init') {
+        return createStatus({
+          last_scan_reason: 'manual',
+          indexed_drive_roots: ['/approved/project'],
+        });
+      }
+
+      return undefined;
+    });
+
+    const globalSearchStore = useGlobalSearchStore();
+    await globalSearchStore.initOnLaunch();
+
+    expect(setUserSettingMock).toHaveBeenCalledWith(
+      'globalSearch.selectedDriveRoots',
+      ['/approved/project'],
+    );
+    expect(setUserSettingMock).toHaveBeenCalledWith('globalSearch.enabled', true);
+  });
+
+  it('does not enable indexing when a legacy index was created automatically', async () => {
+    userSettings.globalSearch.enabled = null;
+    userSettings.globalSearch.selectedDriveRoots = [];
+    invokeMock.mockImplementation(async (command: string) => {
+      if (command === 'global_search_init') {
+        return createStatus({
+          last_scan_reason: 'idle',
+          indexed_drive_roots: ['/', '/run/media/example'],
+        });
+      }
+
+      return undefined;
+    });
+
+    const globalSearchStore = useGlobalSearchStore();
+    await globalSearchStore.initOnLaunch();
+
+    expect(setUserSettingMock).toHaveBeenCalledWith('globalSearch.enabled', false);
+    expect(setUserSettingMock).not.toHaveBeenCalledWith(
+      'globalSearch.selectedDriveRoots',
+      expect.anything(),
+    );
     expect(invokeMock).not.toHaveBeenCalledWith('global_search_start_scan', expect.anything());
   });
 

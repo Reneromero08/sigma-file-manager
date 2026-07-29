@@ -131,7 +131,8 @@
       "committing": "Salvataggio indice",
       "outdated": "Obsoleto",
       "empty": "Nessun dato",
-      "error": "Errore"
+      "error": "Errore",
+      "disabled": "Disabled"
     },
     "relativeTime": {
       "justNow": "Proprio ora",
@@ -146,7 +147,20 @@
       "indexed": "Indicizzato {time}",
       "nothingFound": "Non è stato trovato nulla"
     },
-    "showSearchSettings": "Mostra impostazioni di ricerca"
+    "showSearchSettings": "Mostra impostazioni di ricerca",
+    "indexingControl": {
+      "label": "Sigma indexing",
+      "ariaLabel": "Sigma global indexing status",
+      "stop": "Stop",
+      "disable": "Disable",
+      "status": {
+        "disabled": "Disabled",
+        "idle": "Idle",
+        "indexing": "Indexing",
+        "stopping": "Stopping",
+        "error": "Error"
+      }
+    }
   },
   "home": {
     "mediaBannerOptions": "Opzioni del banner multimediale",

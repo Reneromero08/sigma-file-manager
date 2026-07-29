@@ -46,6 +46,7 @@ export function useEmbedPages() {
         return {
           pageId,
           extensionId: registration.extensionId,
+          extensionVersion: installed?.version ?? '',
           url: registration.page.url ?? '',
           iconPath: installed?.manifest?.icon,
         };

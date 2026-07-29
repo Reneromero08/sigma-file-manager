@@ -13,12 +13,12 @@ mod http;
 mod install;
 mod manifest_permissions;
 mod misc;
-mod paths;
+pub(crate) mod paths;
 mod processes;
 mod registry_storage;
-mod security;
+pub(crate) mod security;
 mod state;
-mod types;
+pub(crate) mod types;
 
 #[allow(unused_imports)]
 pub use types::{

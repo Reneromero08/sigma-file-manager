@@ -131,7 +131,8 @@
       "committing": "Dizin kaydediliyor",
       "outdated": "Güncel değil",
       "empty": "Veri yok",
-      "error": "Hata"
+      "error": "Hata",
+      "disabled": "Disabled"
     },
     "relativeTime": {
       "justNow": "Az önce",
@@ -146,7 +147,20 @@
       "indexed": "{time} dizine eklendi",
       "nothingFound": "Hiçbir şey bulunamadı"
     },
-    "showSearchSettings": "Arama ayarlarını göster"
+    "showSearchSettings": "Arama ayarlarını göster",
+    "indexingControl": {
+      "label": "Sigma indexing",
+      "ariaLabel": "Sigma global indexing status",
+      "stop": "Stop",
+      "disable": "Disable",
+      "status": {
+        "disabled": "Disabled",
+        "idle": "Idle",
+        "indexing": "Indexing",
+        "stopping": "Stopping",
+        "error": "Error"
+      }
+    }
   },
   "home": {
     "mediaBannerOptions": "Medya banner seçenekleri",

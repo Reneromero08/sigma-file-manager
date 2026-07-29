@@ -2,16 +2,6 @@
 // License: GNU GPLv3 or later. See the license file in the project root for more information.
 // Copyright © 2021 - present Aleksey Hoffman. All rights reserved.
 
-mod commands;
-mod handlers;
-mod mdns;
-mod network;
-mod server;
-pub(crate) mod streaming;
-mod tls;
-mod types;
-
-pub use commands::*;
-
-#[allow(unused_imports)]
-pub use types::LanShareResult;
+export function shouldUseNativeClipboardWatcher(isLinux: boolean): boolean {
+  return !isLinux;
+}

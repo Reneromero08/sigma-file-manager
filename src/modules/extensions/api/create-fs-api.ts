@@ -2,7 +2,7 @@
 // License: GNU GPLv3 or later. See the license file in the project root for more information.
 // Copyright © 2021 - present Aleksey Hoffman. All rights reserved.
 
-import { convertFileSrc } from '@tauri-apps/api/core';
+import { invoke } from '@tauri-apps/api/core';
 import { open } from '@tauri-apps/plugin-dialog';
 import type {
   ExtensionDirEntry,
@@ -12,6 +12,7 @@ import type { DirContents, DirEntry } from '@/types/dir-entry';
 import { useExtensionsStorageStore } from '@/stores/storage/extensions';
 import type { ExtensionContext } from '@/modules/extensions/api/extension-context';
 import { invokeAsExtension } from '@/modules/extensions/runtime/extension-invoke';
+import type { MediaStreamLease } from '@/utils/media-stream-url';
 
 function toExtensionDirEntry(entry: DirEntry): ExtensionDirEntry {
   return {
@@ -287,7 +288,8 @@ export function createFsAPI(context: ExtensionContext) {
       },
       toAssetUrl: async (path: string): Promise<string> => {
         await requireScopedReadAccess(path);
-        return convertFileSrc(path);
+        const lease = await invoke<MediaStreamLease>('create_media_stream_url', { path });
+        return lease.url;
       },
     },
   };

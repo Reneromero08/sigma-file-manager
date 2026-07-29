@@ -16,7 +16,7 @@ import {
 import { BUILTIN_NAVIGATOR_ICON_THEME_IDS } from '@/types/icon-theme';
 
 export const USER_SETTINGS_SCHEMA_VERSION_KEY = '__schemaVersion';
-export const USER_SETTINGS_SCHEMA_VERSION = 24;
+export const USER_SETTINGS_SCHEMA_VERSION = 25;
 
 export const DEFAULT_GLOBAL_SEARCH_IGNORED_PATHS = [
   '/node_modules',
@@ -453,6 +453,17 @@ async function migrateUserSettingsStep(storage: StorageAdapter, fromVersion: num
       'navigator.enableBoxSelection',
       currentBoxSelectionEnabled ?? legacyBoxSelectionEnabled === true,
     );
+  }
+
+  if (fromVersion === 24 && toVersion === 25) {
+    const existingEnabled = await storage.get<unknown>('globalSearch.enabled');
+
+    if (typeof existingEnabled !== 'boolean') {
+      const selectedRoots = await storage.get<unknown>('globalSearch.selectedDriveRoots');
+      const hasExplicitRoots = Array.isArray(selectedRoots)
+        && selectedRoots.some(root => typeof root === 'string' && root.trim().length > 0);
+      await storage.set('globalSearch.enabled', hasExplicitRoots ? true : null);
+    }
   }
 
   if (fromVersion === 6 && toVersion === 7) {

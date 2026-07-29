@@ -40,6 +40,7 @@ const { drives } = useDrives();
 const displayTick = ref(0);
 let displayTickIntervalId: ReturnType<typeof setInterval> | null = null;
 
+const indexingEnabled = computed(() => userSettingsStore.userSettings.globalSearch.enabled === true);
 const scanDepth = computed(() => userSettingsStore.userSettings.globalSearch.scanDepth);
 const parallelScan = computed(() => userSettingsStore.userSettings.globalSearch.parallelScan);
 const autoReindexWhenIdle = computed(() => userSettingsStore.userSettings.globalSearch.autoReindexWhenIdle);
@@ -168,7 +169,7 @@ const selectedDriveCount = computed(() => {
     return selected.filter(path => availableDrivePaths.includes(path)).length;
   }
 
-  return drives.value.length;
+  return 0;
 });
 
 const indexedDriveRootKeys = computed(() => new Set(globalSearchStore.indexedDriveRoots.map(path =>
@@ -189,6 +190,7 @@ const indexStatus = computed(() => {
   if (globalSearchStore.scanPhase === 'canceling') return 'canceling';
   if (globalSearchStore.scanPhase === 'committing' || globalSearchStore.isCommitting) return 'committing';
   if (globalSearchStore.scanPhase === 'scanning' || globalSearchStore.isScanInProgress) return 'scanning';
+  if (!indexingEnabled.value || selectedDriveRoots.value.length === 0) return 'disabled';
   if (globalSearchStore.driveScanErrors.length > 0 && globalSearchStore.indexedItemCount === 0) return 'error';
   if (globalSearchStore.indexedItemCount === 0) return 'empty';
   if (!globalSearchStore.lastScanTime) return 'empty';
@@ -271,6 +273,14 @@ function setAutoReindexWhenIdle(value: boolean) {
   userSettingsStore.set('globalSearch.autoReindexWhenIdle', value);
 }
 
+async function setIndexingEnabled(value: boolean) {
+  await userSettingsStore.set('globalSearch.enabled', value);
+
+  if (!value && globalSearchStore.isScanInProgress) {
+    await globalSearchStore.cancelScan();
+  }
+}
+
 function setAutoScanPeriodMinutes(value: string | number | undefined) {
   const period = Math.max(15, Math.floor(Number(value ?? 60)));
   userSettingsStore.set('globalSearch.autoScanPeriodMinutes', period);
@@ -335,6 +345,10 @@ onUnmounted(() => {
       :title="t('settings.globalSearch.searchData')"
       :icon="DatabaseIcon"
     >
+      <Switch
+        :model-value="indexingEnabled"
+        @update:model-value="setIndexingEnabled"
+      />
       <template #description>
         <span class="global-search-settings__priority-index-description">
           {{ t('settings.globalSearch.searchIndexingDescription') }}
@@ -391,7 +405,7 @@ onUnmounted(() => {
                 variant="outline"
                 size="sm"
                 class="global-search-settings__rescan-button"
-                :disabled="globalSearchStore.isScanInProgress || globalSearchStore.isCommitting"
+                :disabled="!indexingEnabled || selectedDriveRoots.length === 0 || globalSearchStore.isScanInProgress || globalSearchStore.isCommitting"
                 @click="rescan"
               >
                 <RefreshCcwIcon

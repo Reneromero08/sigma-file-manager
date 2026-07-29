@@ -48,6 +48,7 @@ const { activeEmbedPageId, visitedEmbedPages } = useEmbedPages();
             <ExtensionEmbed
               class="app-layout__extension-embed"
               :extension-id="embedPage.extensionId"
+              :extension-version="embedPage.extensionVersion"
               :embed-script-path="embedPage.url"
               :icon-path="embedPage.iconPath"
               :is-active="activeEmbedPageId === embedPage.pageId"

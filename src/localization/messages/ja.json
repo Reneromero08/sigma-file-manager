@@ -131,7 +131,8 @@
       "committing": "インデックス保存中",
       "outdated": "古い",
       "empty": "データなし",
-      "error": "エラー"
+      "error": "エラー",
+      "disabled": "Disabled"
     },
     "relativeTime": {
       "justNow": "たった今",
@@ -146,7 +147,20 @@
       "indexed": "{time}にインデックス作成",
       "nothingFound": "何も見つかりませんでした"
     },
-    "showSearchSettings": "検索設定を表示"
+    "showSearchSettings": "検索設定を表示",
+    "indexingControl": {
+      "label": "Sigma indexing",
+      "ariaLabel": "Sigma global indexing status",
+      "stop": "Stop",
+      "disable": "Disable",
+      "status": {
+        "disabled": "Disabled",
+        "idle": "Idle",
+        "indexing": "Indexing",
+        "stopping": "Stopping",
+        "error": "Error"
+      }
+    }
   },
   "home": {
     "mediaBannerOptions": "メディアバナーオプション",
