@@ -332,42 +332,40 @@ onUnmounted(() => {
         sandbox="allow-scripts"
         title=""
       />
-      <Transition name="extension-embed-loader">
-        <div
-          v-if="loadState !== 'loaded'"
-          class="extension-embed__loader"
-          :data-state="loadState"
-        >
-          <div class="extension-embed__loader-icon-wrap">
-            <ExtensionIcon
-              :extension-id="extensionId"
-              :icon-path="iconPath"
-              :size="48"
-            />
-          </div>
-          <p class="extension-embed__loader-text">
-            {{
-              loadState === 'failed'
-                ? t('extensions.loadingExtensionFailed', 'Extension workspace could not be loaded.')
-                : t('extensions.loadingExtension')
-            }}
-          </p>
-          <p
-            v-if="loadState === 'failed' && loadError"
-            class="extension-embed__loader-error"
-          >
-            {{ loadError }}
-          </p>
-          <button
-            v-if="loadState === 'failed'"
-            class="extension-embed__retry"
-            type="button"
-            @click="mountEmbed"
-          >
-            {{ t('extensions.retryLoadingExtension', 'Retry') }}
-          </button>
+      <div
+        v-if="loadState !== 'loaded'"
+        class="extension-embed__loader"
+        :data-state="loadState"
+      >
+        <div class="extension-embed__loader-icon-wrap">
+          <ExtensionIcon
+            :extension-id="extensionId"
+            :icon-path="iconPath"
+            :size="48"
+          />
         </div>
-      </Transition>
+        <p class="extension-embed__loader-text">
+          {{
+            loadState === 'failed'
+              ? t('extensions.loadingExtensionFailed', 'Extension workspace could not be loaded.')
+              : t('extensions.loadingExtension')
+          }}
+        </p>
+        <p
+          v-if="loadState === 'failed' && loadError"
+          class="extension-embed__loader-error"
+        >
+          {{ loadError }}
+        </p>
+        <button
+          v-if="loadState === 'failed'"
+          class="extension-embed__retry"
+          type="button"
+          @click="mountEmbed"
+        >
+          {{ t('extensions.retryLoadingExtension', 'Retry') }}
+        </button>
+      </div>
     </div>
   </div>
 </template>
@@ -460,15 +458,4 @@ onUnmounted(() => {
   background: var(--color-background-3);
 }
 
-.extension-embed-loader-enter-active {
-  transition: none;
-}
-
-.extension-embed-loader-leave-active {
-  transition: opacity 0.2s ease;
-}
-
-.extension-embed-loader-leave-to {
-  opacity: 0;
-}
 </style>

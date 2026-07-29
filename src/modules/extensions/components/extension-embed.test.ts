@@ -119,7 +119,7 @@ describe('ExtensionEmbed', () => {
     expect(currentWrapper.find('[data-state="loading"]').exists()).toBe(true);
   });
 
-  it('clears the loading state after a successful workspace mount', async () => {
+  it('removes the loading overlay after a successful workspace mount', async () => {
     const currentWrapper = mountEmbed();
     const iframe = getIframe(currentWrapper);
 
@@ -127,7 +127,8 @@ describe('ExtensionEmbed', () => {
       type: 'embed-ready',
     });
 
-    expect(currentWrapper.find('[data-state]').exists()).toBe(false);
+    expect(currentWrapper.find('.extension-embed__loader').exists()).toBe(false);
+    expect(currentWrapper.text()).not.toContain('extensions.loadingExtension');
     expect(currentWrapper.get('iframe').attributes('data-load-state')).toBe('loaded');
   });
 
