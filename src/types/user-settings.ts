@@ -208,6 +208,7 @@ export type UserSettings = {
 };
 
 export type UserSettingsGlobalSearch = {
+  enabled: boolean | null;
   scanDepth: number;
   autoScanPeriodMinutes: number;
   autoReindexWhenIdle: boolean;

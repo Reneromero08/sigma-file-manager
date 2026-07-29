@@ -26,6 +26,10 @@ export type BundledUniversalLibraryBootstrapOptions = {
   resolveSourcePath?: () => Promise<string>;
   readManifestPreview?: (sourcePath: string) => Promise<BundledExtensionManifestPreview>;
   markerStore?: BundledExtensionMarkerStore;
+  isInstalledExtensionComplete?: (
+    extensionId: string,
+    sourcePath: string,
+  ) => Promise<boolean>;
 };
 
 async function resolveBundledSourcePath(): Promise<string> {
@@ -36,6 +40,16 @@ async function readBundledManifestPreview(
   sourcePath: string,
 ): Promise<BundledExtensionManifestPreview> {
   return invoke<BundledExtensionManifestPreview>('read_local_extension_manifest', {
+    sourcePath,
+  });
+}
+
+async function isBundledInstallationComplete(
+  extensionId: string,
+  sourcePath: string,
+): Promise<boolean> {
+  return invoke<boolean>('installed_local_extension_matches_source', {
+    extensionId,
     sourcePath,
   });
 }
@@ -54,6 +68,9 @@ export async function bootstrapBundledUniversalLibrary(
     preview,
     markerStore,
     getInstalledExtension: options.getInstalledExtension,
+    isInstalledExtensionComplete: () => (
+      options.isInstalledExtensionComplete ?? isBundledInstallationComplete
+    )(BUNDLED_UNIVERSAL_LIBRARY_ID, sourcePath),
     installFromSource: options.installLocalExtension,
     refreshFromSource: options.refreshLocalExtensionFromSource,
   });

@@ -223,4 +223,29 @@ describe('migrateUserSettingsStorage', () => {
     expect(storage.values.get(USER_SETTINGS_SCHEMA_VERSION_KEY)).toBe(USER_SETTINGS_SCHEMA_VERSION);
     expect(storage.save).toHaveBeenCalledOnce();
   });
+
+  it('leaves legacy implicit-all indexing disabled pending runtime evidence', async () => {
+    const storage = createStorageAdapter({
+      [USER_SETTINGS_SCHEMA_VERSION_KEY]: 24,
+      'globalSearch.selectedDriveRoots': [],
+      'globalSearch.autoReindexWhenIdle': true,
+    });
+
+    await migrateUserSettingsStorage(storage);
+
+    expect(storage.values.get('globalSearch.enabled')).toBeNull();
+    expect(storage.values.get(USER_SETTINGS_SCHEMA_VERSION_KEY)).toBe(USER_SETTINGS_SCHEMA_VERSION);
+  });
+
+  it('preserves indexing intent when legacy settings contain explicit roots', async () => {
+    const storage = createStorageAdapter({
+      [USER_SETTINGS_SCHEMA_VERSION_KEY]: 24,
+      'globalSearch.selectedDriveRoots': ['/approved/project'],
+    });
+
+    await migrateUserSettingsStorage(storage);
+
+    expect(storage.values.get('globalSearch.enabled')).toBe(true);
+    expect(storage.values.get('globalSearch.selectedDriveRoots')).toEqual(['/approved/project']);
+  });
 });

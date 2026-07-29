@@ -101,6 +101,10 @@ import type { ShortcutKeys } from '@/types/user-settings';
 import type { ExtensionKeybindingWhen } from '@/types/extension';
 import { clearInstalledIconThemeCache } from '@/modules/icon-theme/extension-icon-themes';
 import { resetNavigatorIconThemesForExtension } from '@/modules/icon-theme/navigator-icon-theme-settings';
+import {
+  BUNDLED_UNIVERSAL_LIBRARY_ID,
+  markBundledExtensionIntentionallyUninstalled,
+} from '@/modules/extensions/bundled-extension-sync';
 
 export const useExtensionsStore = defineStore('extensions', () => {
   const storageStore = useExtensionsStorageStore();
@@ -1160,6 +1164,10 @@ export const useExtensionsStore = defineStore('extensions', () => {
 
   async function uninstallExtension(extensionId: string): Promise<void> {
     await removeInstalledExtension(extensionId);
+
+    if (extensionId === BUNDLED_UNIVERSAL_LIBRARY_ID) {
+      markBundledExtensionIntentionallyUninstalled(window.localStorage, extensionId);
+    }
   }
 
   async function updateExtension(

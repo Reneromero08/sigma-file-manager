@@ -154,17 +154,28 @@ export const useGlobalSearchStore = defineStore('globalSearch', () => {
   }
 
   async function getDriveRoots(): Promise<string[]> {
-    const selected = userSettingsStore.userSettings.globalSearch.selectedDriveRoots;
-    if (selected.length > 0) return selected;
+    return [...userSettingsStore.userSettings.globalSearch.selectedDriveRoots];
+  }
 
-    try {
-      const systemDrives = await invoke<Array<{ path: string }>>('get_system_drives');
-      return systemDrives.map(drive => drive.path);
+  async function resolveLegacyIndexingAuthorization(status: GlobalSearchStatus) {
+    const settings = userSettingsStore.userSettings.globalSearch;
+
+    if (settings.enabled !== null) {
+      return;
     }
-    catch (error) {
-      lastError.value = String(error);
-      return [];
+
+    const explicitlySelectedRoots = settings.selectedDriveRoots;
+    const legacyScanWasExplicit = status.last_scan_reason === 'manual'
+      || status.last_scan_reason === 'settingsChange';
+    const legacyApprovedRoots = explicitlySelectedRoots.length > 0
+      ? explicitlySelectedRoots
+      : (legacyScanWasExplicit ? status.indexed_drive_roots : []);
+
+    if (legacyApprovedRoots.length > 0 && explicitlySelectedRoots.length === 0) {
+      await userSettingsStore.set('globalSearch.selectedDriveRoots', [...legacyApprovedRoots]);
     }
+
+    await userSettingsStore.set('globalSearch.enabled', legacyApprovedRoots.length > 0);
   }
 
   function updateStatusFromResponse(status: GlobalSearchStatus) {
@@ -210,15 +221,22 @@ export const useGlobalSearchStore = defineStore('globalSearch', () => {
     try {
       const status = await invoke<GlobalSearchStatus>('global_search_init');
       updateStatusFromResponse(status);
+      await resolveLegacyIndexingAuthorization(status);
       isInitialized.value = true;
       lastError.value = null;
 
       lastKnownDriveCount.value = sharedDrives.value.length;
 
-      wireUserIdleDetectionToReindex();
-
       const settings = userSettingsStore.userSettings.globalSearch;
-      const shouldRescanOnLaunch = !getIsAutoReindexSuppressed()
+      const indexingEnabled = settings.enabled === true;
+
+      if (indexingEnabled) {
+        wireUserIdleDetectionToReindex();
+      }
+
+      const shouldRescanOnLaunch = indexingEnabled
+        && settings.selectedDriveRoots.length > 0
+        && !getIsAutoReindexSuppressed()
         && (needsScan.value || (settings.autoReindexWhenIdle && getIsIndexStale()));
 
       if (shouldRescanOnLaunch) {
@@ -228,7 +246,10 @@ export const useGlobalSearchStore = defineStore('globalSearch', () => {
     catch (error) {
       lastError.value = String(error);
       isInitialized.value = true;
-      wireUserIdleDetectionToReindex();
+
+      if (userSettingsStore.userSettings.globalSearch.enabled === true) {
+        wireUserIdleDetectionToReindex();
+      }
     }
   }
 
@@ -270,6 +291,13 @@ export const useGlobalSearchStore = defineStore('globalSearch', () => {
     if (isScanInProgress.value) return;
 
     try {
+      const settings = userSettingsStore.userSettings.globalSearch;
+
+      if (settings.enabled !== true) {
+        lastError.value = 'Global search indexing is disabled';
+        return;
+      }
+
       if (scanReasonValue === 'manual' || scanReasonValue === 'driveChange' || scanReasonValue === 'settingsChange') {
         await clearAutoReindexSuppression();
       }
@@ -528,6 +556,7 @@ export const useGlobalSearchStore = defineStore('globalSearch', () => {
   function checkIdleReindex() {
     const settings = userSettingsStore.userSettings.globalSearch;
 
+    if (settings.enabled !== true) return;
     if (!settings.autoReindexWhenIdle) return;
     if (isScanInProgress.value) return;
     if (getIsAutoReindexSuppressed()) return;
@@ -583,6 +612,7 @@ export const useGlobalSearchStore = defineStore('globalSearch', () => {
 
   async function handleDriveListChange() {
     if (!isInitialized.value) return;
+    if (userSettingsStore.userSettings.globalSearch.enabled !== true) return;
 
     const currentCount = sharedDrives.value.length;
 
@@ -614,17 +644,11 @@ export const useGlobalSearchStore = defineStore('globalSearch', () => {
     if (isScanInProgress.value) return;
 
     const settings = userSettingsStore.userSettings.globalSearch;
+    if (settings.enabled !== true) return;
     const selectedRoots = settings.selectedDriveRoots;
-    let driveRoots: string[];
-
-    if (selectedRoots.length > 0) {
-      driveRoots = selectedRoots.filter(root =>
-        sharedDrives.value.some(drive => drive.path === root),
-      );
-    }
-    else {
-      driveRoots = sharedDrives.value.map(drive => drive.path);
-    }
+    const driveRoots = selectedRoots.filter(root =>
+      sharedDrives.value.some(drive => drive.path === root),
+    );
 
     if (driveRoots.length === 0) {
       return;
@@ -659,6 +683,7 @@ export const useGlobalSearchStore = defineStore('globalSearch', () => {
     () => userSettingsStore.userSettings.globalSearch.ignoredPaths,
     async (newPaths, oldPaths) => {
       if (!isInitialized.value) return;
+      if (userSettingsStore.userSettings.globalSearch.enabled !== true) return;
 
       const pathsChanged = JSON.stringify(newPaths) !== JSON.stringify(oldPaths);
 

@@ -5,6 +5,7 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::Ordering;
+use walkdir::WalkDir;
 
 use super::fs_ops::{
     cleanup_trash_directories, copy_dir_recursive, next_managed_temp_dir, remove_dir_force,
@@ -17,7 +18,8 @@ use super::http::{
 use super::paths::{get_extension_dir, get_extensions_base_dir};
 use super::processes::terminate_all_extension_processes;
 use super::security::{
-    acquire_extension_install_lock, authorize_extension_caller, validate_remote_url,
+    acquire_extension_install_lock, authorize_extension_caller, compute_sha256_hex,
+    validate_remote_url,
 };
 use super::state::get_extension_install_cancellation_flag;
 use super::types::{
@@ -85,6 +87,43 @@ fn ensure_install_not_cancelled(cancellation_id: Option<&String>) -> Result<(), 
     }
 
     Ok(())
+}
+
+fn directory_file_hashes(root: &Path) -> Result<Vec<(String, String)>, String> {
+    if !root.is_dir() {
+        return Ok(Vec::new());
+    }
+
+    let mut hashes = Vec::new();
+
+    for entry in WalkDir::new(root) {
+        let entry = entry.map_err(|error| format!("Failed to inspect extension: {}", error))?;
+
+        if entry.file_type().is_symlink() {
+            return Err("Extension directory contains an unsupported symbolic link".to_string());
+        }
+
+        if !entry.file_type().is_file() {
+            continue;
+        }
+
+        let relative_path = entry
+            .path()
+            .strip_prefix(root)
+            .map_err(|error| format!("Failed to resolve extension file path: {}", error))?
+            .to_string_lossy()
+            .replace('\\', "/");
+        let bytes = fs::read(entry.path())
+            .map_err(|error| format!("Failed to read extension file: {}", error))?;
+        hashes.push((relative_path, compute_sha256_hex(&bytes)));
+    }
+
+    hashes.sort_unstable_by(|left, right| left.0.cmp(&right.0));
+    Ok(hashes)
+}
+
+fn directory_contents_match(source_dir: &Path, installed_dir: &Path) -> Result<bool, String> {
+    Ok(directory_file_hashes(source_dir)? == directory_file_hashes(installed_dir)?)
 }
 
 pub async fn cancel_all_extension_commands(
@@ -202,6 +241,22 @@ pub async fn read_local_extension_manifest(
         name: parsed_manifest.name,
         version: parsed_manifest.version,
     })
+}
+
+pub async fn installed_local_extension_matches_source(
+    app_handle: tauri::AppHandle,
+    extension_id: String,
+    source_path: String,
+) -> Result<bool, String> {
+    let source_dir = PathBuf::from(source_path);
+    let parsed_manifest = parse_local_extension_manifest(&source_dir)?;
+
+    if parsed_manifest.extension_id != extension_id {
+        return Ok(false);
+    }
+
+    let installed_dir = get_extension_dir(&app_handle, &extension_id)?;
+    directory_contents_match(&source_dir, &installed_dir)
 }
 
 pub async fn install_local_extension(
@@ -330,4 +385,27 @@ pub async fn get_installed_extensions(
     }
 
     Ok(extensions)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::directory_contents_match;
+    use std::fs;
+
+    #[test]
+    fn compares_complete_and_corrupt_extension_directories() {
+        let source = tempfile::tempdir().expect("source tempdir");
+        let installed = tempfile::tempdir().expect("installed tempdir");
+        fs::create_dir_all(source.path().join("ui")).expect("source ui");
+        fs::create_dir_all(installed.path().join("ui")).expect("installed ui");
+        fs::write(source.path().join("package.json"), b"{}").expect("source manifest");
+        fs::write(installed.path().join("package.json"), b"{}").expect("installed manifest");
+        fs::write(source.path().join("ui/workspace.js"), b"ready").expect("source workspace");
+        fs::write(installed.path().join("ui/workspace.js"), b"ready").expect("installed workspace");
+
+        assert!(directory_contents_match(source.path(), installed.path()).expect("matching dirs"));
+
+        fs::write(installed.path().join("ui/workspace.js"), b"corrupt").expect("corrupt workspace");
+        assert!(!directory_contents_match(source.path(), installed.path()).expect("corrupt dirs"));
+    }
 }

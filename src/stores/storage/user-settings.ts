@@ -143,9 +143,10 @@ export const useUserSettingsStore = defineStore('userSettings', () => {
       increaseFileViewGaps: false,
     },
     globalSearch: {
+      enabled: false,
       scanDepth: 7,
       autoScanPeriodMinutes: 60,
-      autoReindexWhenIdle: true,
+      autoReindexWhenIdle: false,
       ignoredPaths: [...DEFAULT_GLOBAL_SEARCH_IGNORED_PATHS],
       selectedDriveRoots: [],
       parallelScan: false,

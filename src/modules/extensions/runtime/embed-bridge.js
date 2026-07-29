@@ -691,23 +691,17 @@ const sigma = {
   },
 };
 
-const moduleUrl = URL.createObjectURL(new Blob([scriptSource], { type: 'text/javascript' }));
-try {
-  const mod = await import(moduleUrl);
-  if (typeof mod.mount !== 'function') {
-    throw new Error('Extension embed script must export mount(container, context)');
-  }
-  const container = document.getElementById('app');
-  await mod.mount(container, {
-    sigma,
-    extensionId,
-    toolbarContainer: {},
-  });
-  parent.postMessage({
-    bridgeToken,
-    type: 'embed-ready',
-  }, '*');
+const mod = await import(entryModuleUrl);
+if (typeof mod.mount !== 'function') {
+  throw new Error('Extension embed script must export mount(container, context)');
 }
-finally {
-  URL.revokeObjectURL(moduleUrl);
-}
+const container = document.getElementById('app');
+await mod.mount(container, {
+  sigma,
+  extensionId,
+  toolbarContainer: {},
+});
+parent.postMessage({
+  bridgeToken,
+  type: 'embed-ready',
+}, '*');

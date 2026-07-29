@@ -12,6 +12,10 @@ import { getExtensionAPI } from '@/modules/extensions/runtime/loader';
 import { createExtensionApiMethodMap } from '@/modules/extensions/runtime/api-method-map';
 import { clearEmbedHostState, handleEmbedBridgeMessage } from '@/modules/extensions/runtime/embed-host-bridge';
 import { invokeAsExtension } from '@/modules/extensions/runtime/extension-invoke';
+import {
+  createEmbedModuleDataUrl,
+  loadEmbedModuleGraph,
+} from '@/modules/extensions/runtime/embed-module-graph';
 import pathApiCoreScript from '@/modules/extensions/api/path-api-core.js?raw';
 import embedBridgeScript from '@/modules/extensions/runtime/embed-bridge.js?raw';
 
@@ -79,10 +83,10 @@ function handleToolbarRender(toolbarId: string, elements: unknown[]) {
   toolbarApp.mount(container);
 }
 
-function createEmbedSrcdoc(scriptSource: string): string {
+function createEmbedSrcdoc(entryModuleUrl: string): string {
   const runtimeConstants = [
     `const bridgeToken = ${JSON.stringify(bridgeToken)};`,
-    `const scriptSource = ${JSON.stringify(scriptSource)};`,
+    `const entryModuleUrl = ${JSON.stringify(entryModuleUrl)};`,
     `const extensionId = ${JSON.stringify(props.extensionId)};`,
   ].join('\n');
 
@@ -202,14 +206,17 @@ async function mountEmbed() {
   isReady.value = false;
 
   const scriptPath = props.embedScriptPath.replace(/^\//, '');
-  const fileBytes = await invokeAsExtension<number[]>(props.extensionId, 'read_extension_file', {
-    extensionId: props.extensionId,
-    filePath: scriptPath,
+  const moduleGraph = await loadEmbedModuleGraph(scriptPath, async (filePath) => {
+    const fileBytes = await invokeAsExtension<number[]>(props.extensionId, 'read_extension_file', {
+      extensionId: props.extensionId,
+      filePath,
+    });
+    return new TextDecoder().decode(new Uint8Array(fileBytes));
   });
-  const scriptSource = new TextDecoder().decode(new Uint8Array(fileBytes));
+  const entryModuleUrl = createEmbedModuleDataUrl(moduleGraph);
 
   if (iframeRef.value) {
-    iframeRef.value.srcdoc = createEmbedSrcdoc(scriptSource);
+    iframeRef.value.srcdoc = createEmbedSrcdoc(entryModuleUrl);
   }
 }
 

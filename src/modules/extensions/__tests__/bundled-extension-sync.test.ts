@@ -6,7 +6,9 @@ import { describe, expect, it, vi } from 'vitest';
 import type { InstalledExtensionData } from '@/types/extension';
 import {
   BUNDLED_EXTENSION_MARKER_PREFIX,
+  BUNDLED_EXTENSION_UNINSTALLED_MARKER,
   createLocalStorageBundledExtensionMarkerStore,
+  markBundledExtensionIntentionallyUninstalled,
   syncBundledExtension,
   type BundledExtensionMarkerStore,
 } from '@/modules/extensions/bundled-extension-sync';
@@ -71,6 +73,7 @@ describe('syncBundledExtension', () => {
       },
       markerStore: markers,
       getInstalledExtension: () => installed,
+      isInstalledExtensionComplete: vi.fn(async () => true),
       installFromSource,
       refreshFromSource: vi.fn(),
     });
@@ -92,6 +95,7 @@ describe('syncBundledExtension', () => {
       },
       markerStore: markers,
       getInstalledExtension: () => undefined,
+      isInstalledExtensionComplete: vi.fn(async () => true),
       installFromSource: vi.fn(async () => undefined),
       refreshFromSource: vi.fn(),
     });
@@ -110,14 +114,39 @@ describe('syncBundledExtension', () => {
         extensionId,
         version: '0.4.0',
       },
-      markerStore: markerStore('managed'),
+      markerStore: markerStore(BUNDLED_EXTENSION_UNINSTALLED_MARKER),
       getInstalledExtension: () => undefined,
+      isInstalledExtensionComplete: vi.fn(async () => true),
       installFromSource,
       refreshFromSource: vi.fn(),
     });
 
     expect(result).toBe('skipped-user-uninstalled');
     expect(installFromSource).not.toHaveBeenCalled();
+  });
+
+  it('repairs a stale managed marker when the extension registry entry is missing', async () => {
+    let installed: InstalledExtensionData | undefined;
+    const installFromSource = vi.fn(async () => {
+      installed = installedExtension();
+    });
+
+    const result = await syncBundledExtension({
+      extensionId,
+      sourcePath,
+      preview: {
+        extensionId,
+        version: '0.4.0',
+      },
+      markerStore: markerStore('managed'),
+      getInstalledExtension: () => installed,
+      isInstalledExtensionComplete: vi.fn(async () => false),
+      installFromSource,
+      refreshFromSource: vi.fn(),
+    });
+
+    expect(result).toBe('installed');
+    expect(installFromSource).toHaveBeenCalledWith(sourcePath);
   });
 
   it('does not overwrite a manually installed same-id extension', async () => {
@@ -134,6 +163,7 @@ describe('syncBundledExtension', () => {
       getInstalledExtension: () => installedExtension({
         localSourcePath: '/home/raul/dev/universal-library',
       }),
+      isInstalledExtensionComplete: vi.fn(async () => false),
       installFromSource: vi.fn(),
       refreshFromSource,
     });
@@ -154,12 +184,38 @@ describe('syncBundledExtension', () => {
       },
       markerStore: markerStore('managed'),
       getInstalledExtension: () => installedExtension(),
+      isInstalledExtensionComplete: vi.fn(async () => true),
       installFromSource: vi.fn(),
       refreshFromSource,
     });
 
     expect(result).toBe('current');
     expect(refreshFromSource).not.toHaveBeenCalled();
+  });
+
+  it('repairs a partial or corrupt managed installation at the current version', async () => {
+    let installed = installedExtension({ enabled: false });
+    const refreshFromSource = vi.fn(async () => {
+      installed = installedExtension({ enabled: false });
+    });
+
+    const result = await syncBundledExtension({
+      extensionId,
+      sourcePath,
+      preview: {
+        extensionId,
+        version: '0.4.0',
+      },
+      markerStore: markerStore('managed'),
+      getInstalledExtension: () => installed,
+      isInstalledExtensionComplete: vi.fn(async () => false),
+      installFromSource: vi.fn(),
+      refreshFromSource,
+    });
+
+    expect(result).toBe('repaired');
+    expect(refreshFromSource).toHaveBeenCalledWith(extensionId, sourcePath, '0.4.0');
+    expect(installed.enabled).toBe(false);
   });
 
   it('refreshes a managed bundled extension from the current resource mount', async () => {
@@ -184,6 +240,7 @@ describe('syncBundledExtension', () => {
       },
       markerStore: markerStore('managed'),
       getInstalledExtension: () => installed,
+      isInstalledExtensionComplete: vi.fn(async () => true),
       installFromSource: vi.fn(),
       refreshFromSource,
     });
@@ -203,6 +260,7 @@ describe('syncBundledExtension', () => {
       },
       markerStore: markerStore(),
       getInstalledExtension: () => undefined,
+      isInstalledExtensionComplete: vi.fn(async () => true),
       installFromSource: vi.fn(),
       refreshFromSource: vi.fn(),
     })).rejects.toThrow(/Bundled extension id mismatch/);
@@ -226,5 +284,27 @@ describe('createLocalStorageBundledExtensionMarkerStore', () => {
 
     expect(markers.get(extensionId)).toBe('managed');
     expect(values.get(`${BUNDLED_EXTENSION_MARKER_PREFIX}${extensionId}`)).toBe('managed');
+  });
+
+  it('records explicit uninstall without changing a developer-owned extension marker', () => {
+    const values = new Map<string, string>([
+      [`${BUNDLED_EXTENSION_MARKER_PREFIX}${extensionId}`, 'managed'],
+    ]);
+    const storage = {
+      getItem(key: string) {
+        return values.get(key) ?? null;
+      },
+      setItem(key: string, value: string) {
+        values.set(key, value);
+      },
+    };
+
+    markBundledExtensionIntentionallyUninstalled(storage, extensionId);
+    expect(values.get(`${BUNDLED_EXTENSION_MARKER_PREFIX}${extensionId}`))
+      .toBe(BUNDLED_EXTENSION_UNINSTALLED_MARKER);
+
+    values.delete(`${BUNDLED_EXTENSION_MARKER_PREFIX}${extensionId}`);
+    markBundledExtensionIntentionallyUninstalled(storage, extensionId);
+    expect(values.has(`${BUNDLED_EXTENSION_MARKER_PREFIX}${extensionId}`)).toBe(false);
   });
 });
