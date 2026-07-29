@@ -61,11 +61,14 @@
       "csp": null,
       "assetProtocol": {
         "enable": true,
-        "scope": [
-          "**",
-          "/**",
-          "$APPDATA/**"
-        ]
+        "scope": {
+          "allow": [
+            "**",
+            "/**",
+            "$APPDATA/**"
+          ],
+          "requireLiteralLeadingDot": false
+        }
       }
     }
   },

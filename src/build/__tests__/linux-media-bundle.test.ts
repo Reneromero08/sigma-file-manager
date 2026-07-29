@@ -10,7 +10,10 @@ type LinuxBundleConfig = {
   app?: {
     security?: {
       assetProtocol?: {
-        scope?: string[];
+        scope?: {
+          allow?: string[];
+          requireLiteralLeadingDot?: boolean;
+        };
       };
     };
   };
@@ -39,6 +42,7 @@ describe('Linux media packaging', () => {
       'gstreamer1.0-plugins-good',
       'gstreamer1.0-libav',
     ]));
-    expect(config.app?.security?.assetProtocol?.scope).toContain('/**');
+    expect(config.app?.security?.assetProtocol?.scope?.allow).toContain('/**');
+    expect(config.app?.security?.assetProtocol?.scope?.requireLiteralLeadingDot).toBe(false);
   });
 });
