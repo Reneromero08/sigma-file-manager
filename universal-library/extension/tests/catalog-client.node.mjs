@@ -5,6 +5,7 @@ const settings = new Map();
 let managedExecutablePath = null;
 let requestedBinaryId = null;
 let openFileSelection = null;
+let openFileCalls = 0;
 let saveFileSelection = null;
 let lastRun = null;
 let lastProgressRun = null;
@@ -34,6 +35,7 @@ globalThis.sigma = {
   },
   dialog: {
     async openFile() {
+      openFileCalls += 1;
       return openFileSelection;
     },
     async saveFile() {
@@ -64,6 +66,7 @@ beforeEach(() => {
   managedExecutablePath = null;
   requestedBinaryId = null;
   openFileSelection = null;
+  openFileCalls = 0;
   saveFileSelection = null;
   lastRun = null;
   lastProgressRun = null;
@@ -141,13 +144,27 @@ test('clearing the custom override returns to the managed binary', async () => {
   assert.equal(await client.resolveCatalogExecutable({ promptForExecutable: false }), managedExecutablePath);
 });
 
-test('prompts for a custom executable only when no managed binary exists', async () => {
+test('prompts for a custom executable only when explicitly requested', async () => {
   openFileSelection = '/usr/local/bin/ulib';
 
-  await client.runCatalog(['health']);
+  await client.runCatalog(['health'], { promptForExecutable: true });
 
   assert.equal(settings.get(client.EXECUTABLE_SETTING), openFileSelection);
   assert.equal(lastRun.commandPath, openFileSelection);
+  assert.equal(openFileCalls, 1);
+});
+
+test('background catalog access never opens an executable picker', async () => {
+  openFileSelection = '/usr/local/bin/ulib';
+
+  await assert.rejects(
+    client.runCatalog(['health']),
+    /managed catalog or choose a custom executable/,
+  );
+
+  assert.equal(openFileCalls, 0);
+  assert.equal(settings.has(client.EXECUTABLE_SETTING), false);
+  assert.equal(lastRun, null);
 });
 
 test('fails clearly when neither managed nor custom executable is available', async () => {
