@@ -43,6 +43,7 @@ import { Slider } from '@/components/ui/slider';
 import { DEFAULT_BACKGROUND_FILE_NAME } from '@/data/background-media';
 import { useDropOverlayStore } from '@/stores/runtime/drop-overlay';
 import { homeBannerStorageKeys } from '../background-storage-keys';
+import { useMediaStreamUrl } from '@/composables/use-media-stream-url';
 
 const dropOverlayStore = useDropOverlayStore();
 const { t } = useI18n();
@@ -53,6 +54,7 @@ const {
   currentItem,
   getPositionKey,
   getMediaUrl,
+  getMediaPlaybackSource,
   selectMedia,
   ensureMediaCached,
   resolveOffsetMediaSelection,
@@ -67,15 +69,30 @@ watch(isMediaEditorOpen, (open) => {
   dropOverlayStore.setBackgroundManagerOpen(open);
 }, { immediate: true });
 
-const currentMediaUrl = computed(() => {
-  const item = currentItem.value;
-  return item ? getMediaUrl(item) : '';
-});
-
 const currentMediaType = computed(() => {
   const item = currentItem.value;
   if (!item) return 'image';
   return item.kind === 'builtin' ? item.data.type : item.type;
+});
+
+const currentMediaSource = computed(() => {
+  const item = currentItem.value;
+  return item ? getMediaPlaybackSource(item) : '';
+});
+const { mediaStreamUrl } = useMediaStreamUrl(
+  currentMediaSource,
+  () => currentMediaType.value === 'video',
+);
+const currentMediaUrl = computed(() => {
+  const item = currentItem.value;
+
+  if (!item) {
+    return '';
+  }
+
+  return currentMediaType.value === 'video'
+    ? mediaStreamUrl.value
+    : getMediaUrl(item);
 });
 
 const currentPositionX = computed(() => {

@@ -7,7 +7,7 @@ mod handlers;
 mod mdns;
 mod network;
 mod server;
-mod streaming;
+pub(crate) mod streaming;
 mod tls;
 mod types;
 

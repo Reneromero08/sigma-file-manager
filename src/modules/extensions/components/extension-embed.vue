@@ -102,7 +102,7 @@ function createEmbedSrcdoc(entryModuleUrl: string, attemptToken: string): string
     <meta charset="utf-8">
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'none'; style-src 'unsafe-inline'; img-src data: blob: asset: sigma-extension: http://sigma-extension.localhost; font-src data: blob:; media-src blob: asset:; script-src 'unsafe-inline' sigma-extension: http://sigma-extension.localhost; connect-src blob: asset: sigma-extension: http://sigma-extension.localhost;"
+      content="default-src 'none'; style-src 'unsafe-inline'; img-src data: blob: asset: http://127.0.0.1:* sigma-extension: http://sigma-extension.localhost; font-src data: blob:; media-src blob: asset: http://127.0.0.1:*; script-src 'unsafe-inline' sigma-extension: http://sigma-extension.localhost; connect-src blob: asset: http://127.0.0.1:* sigma-extension: http://sigma-extension.localhost;"
     >
     <style>
       html, body, #app {

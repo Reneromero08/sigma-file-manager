@@ -52,6 +52,7 @@ import {
 } from '@/utils/auxiliary-windows';
 import { useImageThumbnails } from '@/modules/navigator/components/file-browser/composables/use-image-thumbnails';
 import { useHorizontalFixedVirtualList } from '@/composables/use-horizontal-fixed-virtual-list';
+import { useMediaStreamUrl } from '@/composables/use-media-stream-url';
 
 const { t } = useI18n();
 
@@ -216,8 +217,20 @@ const fileName = computed((): string => {
   return getFileName(currentFilePath.value);
 });
 
+const shouldUseMediaStream = computed(() => (
+  Boolean(currentFilePath.value)
+  && !isHttpOrHttpsUrl(currentFilePath.value ?? '')
+  && (fileType.value === 'video' || fileType.value === 'audio')
+));
+
+const { mediaStreamUrl } = useMediaStreamUrl(
+  currentFilePath,
+  shouldUseMediaStream,
+);
+
 const fileAssetUrl = computed((): string => {
   if (!currentFilePath.value) return '';
+  if (shouldUseMediaStream.value) return mediaStreamUrl.value;
   return getQuickViewDisplayUrl(currentFilePath.value);
 });
 

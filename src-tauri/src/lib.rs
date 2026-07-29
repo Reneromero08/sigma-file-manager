@@ -21,6 +21,7 @@ mod image_thumbnails;
 mod input_simulation;
 mod lan_share;
 mod link_operations;
+mod media_stream;
 mod open_with;
 mod process_runner;
 mod startup_storage_bootstrap;
@@ -221,6 +222,7 @@ fn get_launch_context() -> LaunchContext {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .manage(media_stream::MediaStreamState::default())
         .register_uri_scheme_protocol("sigma-extension", extension_module_protocol::handle_request)
         .manage(startup_storage_bootstrap::StartupStorageBootstrapState::default())
         .plugin(
@@ -284,6 +286,8 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             configure_webview_hide_pdf_more_settings,
             get_launch_context,
+            media_stream::create_media_stream_url,
+            media_stream::release_media_stream,
             startup_storage_bootstrap::get_startup_storage_bootstrap,
             default_file_manager::default_file_manager_available,
             default_file_manager::is_default_file_manager,

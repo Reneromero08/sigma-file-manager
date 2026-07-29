@@ -8,14 +8,14 @@ import {
 import type { ExtensionPermission } from '@/types/extension';
 import type { ExtensionContext } from '@/modules/extensions/api/extension-context';
 
-const { invokeAsExtensionMock, hasScopedAccessMock, convertFileSrcMock } = vi.hoisted(() => ({
+const { invokeAsExtensionMock, hasScopedAccessMock, invokeMock } = vi.hoisted(() => ({
   invokeAsExtensionMock: vi.fn(),
   hasScopedAccessMock: vi.fn(),
-  convertFileSrcMock: vi.fn(),
+  invokeMock: vi.fn(),
 }));
 
 vi.mock('@tauri-apps/api/core', () => ({
-  convertFileSrc: convertFileSrcMock,
+  invoke: invokeMock,
 }));
 
 vi.mock('@tauri-apps/plugin-dialog', () => ({
@@ -71,7 +71,7 @@ describe('createFsAPI', () => {
   beforeEach(() => {
     invokeAsExtensionMock.mockReset();
     hasScopedAccessMock.mockReset();
-    convertFileSrcMock.mockReset();
+    invokeMock.mockReset();
   });
 
   it('allows generic exists for extension storage paths', async () => {
@@ -184,18 +184,23 @@ describe('createFsAPI', () => {
   it('creates a scoped streamable asset URL only after read authorization', async () => {
     const context = createContext(['fs.read']);
     hasScopedAccessMock.mockResolvedValueOnce(true);
-    convertFileSrcMock.mockReturnValueOnce('asset://localhost/library/kick.wav');
+    invokeMock.mockResolvedValueOnce({
+      url: 'http://127.0.0.1:45678/media/kick',
+      token: 'kick',
+    });
     const fsApi = createFsAPI(context);
 
     await expect(fsApi.scoped.toAssetUrl('/library/kick.wav'))
-      .resolves.toBe('asset://localhost/library/kick.wav');
+      .resolves.toBe('http://127.0.0.1:45678/media/kick');
 
     expect(hasScopedAccessMock).toHaveBeenCalledWith(
       'test.extension',
       '/library/kick.wav',
       'read',
     );
-    expect(convertFileSrcMock).toHaveBeenCalledWith('/library/kick.wav');
+    expect(invokeMock).toHaveBeenCalledWith('create_media_stream_url', {
+      path: '/library/kick.wav',
+    });
   });
 
   it('rejects scoped asset URLs outside approved directories', async () => {
@@ -205,7 +210,7 @@ describe('createFsAPI', () => {
 
     await expect(fsApi.scoped.toAssetUrl('/private/secret.wav'))
       .rejects.toThrow(/not in scoped directories/);
-    expect(convertFileSrcMock).not.toHaveBeenCalled();
+    expect(invokeMock).not.toHaveBeenCalled();
   });
 
   it('allows importing a file selected from a dialog', async () => {

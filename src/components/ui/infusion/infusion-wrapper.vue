@@ -14,13 +14,19 @@ import { useDropOverlayStore } from '@/stores/runtime/drop-overlay';
 import { useBackgroundMedia } from '@/modules/home/composables/use-background-media';
 import { backgroundMedia, DEFAULT_INFUSION_BACKGROUND_FILE_NAME } from '@/data/background-media';
 import type { InfusionPage } from '@/types/user-settings';
+import { useMediaStreamUrl } from '@/composables/use-media-stream-url';
 
 const userSettingsStore = useUserSettingsStore();
 const appStateStore = useAppStateStore();
 const appWindowStore = useAppWindowStore();
 const dropOverlayStore = useDropOverlayStore();
 const route = useRoute();
-const { getMediaUrl, ensureMediaCached, resolveMediaSelection } = useBackgroundMedia();
+const {
+  getMediaUrl,
+  getMediaPlaybackSource,
+  ensureMediaCached,
+  resolveMediaSelection,
+} = useBackgroundMedia();
 
 const infusionSettings = computed(() => userSettingsStore.userSettings.infusion);
 
@@ -51,7 +57,9 @@ function getInfusionMediaFromBackground(background: {
 
   if (selection) {
     return {
-      url: getMediaUrl(selection.item),
+      url: selection.type === 'video'
+        ? getMediaPlaybackSource(selection.item)
+        : getMediaUrl(selection.item),
       type: selection.type,
     };
   }
@@ -64,8 +72,17 @@ function getInfusionMediaFromBackground(background: {
 
 const infusionMediaInfo = computed(() => getInfusionMediaFromBackground(effectivePageSettings.value.background));
 
-const infusionSrc = computed(() => infusionMediaInfo.value.url);
 const infusionType = computed(() => infusionMediaInfo.value.type);
+const infusionMediaSource = computed(() => infusionMediaInfo.value.url);
+const { mediaStreamUrl } = useMediaStreamUrl(
+  infusionMediaSource,
+  () => infusionType.value === 'video',
+);
+const infusionSrc = computed(() => (
+  infusionType.value === 'video'
+    ? mediaStreamUrl.value
+    : infusionMediaSource.value
+));
 
 watch(
   () => resolveMediaSelection(

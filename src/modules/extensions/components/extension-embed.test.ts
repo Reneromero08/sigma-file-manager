@@ -114,6 +114,7 @@ describe('ExtensionEmbed', () => {
     expect(srcdoc).toContain(
       'script-src \'unsafe-inline\' sigma-extension: http://sigma-extension.localhost;',
     );
+    expect(srcdoc).toContain('media-src blob: asset: http://127.0.0.1:*;');
     expect(srcdoc).not.toContain('unsafe-eval');
     expect(srcdoc).not.toMatch(/script-src[^;]*data:/);
     expect(currentWrapper.find('[data-state="loading"]').exists()).toBe(true);
