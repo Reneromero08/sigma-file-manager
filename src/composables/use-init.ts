@@ -409,7 +409,9 @@ export function useInit() {
             ]
           ),
           installLocalExtension: sourcePath => (
-            extensionsStore.installLocalExtension(sourcePath)
+            extensionsStore.installLocalExtension(sourcePath, {
+              deferBinarySetup: true,
+            })
           ),
           refreshLocalExtensionFromSource: async (
             extensionId,
